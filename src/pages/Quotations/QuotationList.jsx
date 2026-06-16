@@ -1,0 +1,137 @@
+import { Link } from "react-router-dom";
+import { FileDown, FilePlus2, Pencil } from "lucide-react";
+import toast from "@utils/notify";
+import GenericResourcePage from "../_shared/GenericResourcePage";
+import StatusBadge from "../../components/status/StatusBadge";
+import { modules } from "../../utils/api";
+import { money, date } from "../../utils/format";
+
+const isConvertedQuotation = (row) =>
+  String(row?.status || "").toLowerCase() === "converted" ||
+  Boolean(row?.converted_invoice_id);
+
+export default function QuotationList() {
+  async function exportPdf(row) {
+    const toastId = toast.loading("Creating quotation PDF...");
+    try {
+      await modules.pdf.quotation(row.id, "export");
+      toast.success("Quotation PDF exported", { id: toastId });
+    } catch (error) {
+      toast.error(error.message, { id: toastId });
+    }
+  }
+
+  return (
+    <GenericResourcePage
+      title="Quotations"
+      subtitle="Proposals for software services and consulting engagements"
+      api={modules.quotations}
+      disableInlineEdit
+      fields={[
+        {
+          name: "customer_id",
+          label: "Customer ID",
+          type: "number",
+          required: true,
+        },
+        { name: "quotation_date", label: "Quotation Date", required: true },
+        { name: "valid_until", label: "Valid Until" },
+        { name: "status", label: "Status" },
+        { name: "notes", label: "Notes" },
+      ]}
+      columns={[
+        {
+          key: "quotation_no",
+          label: "Quotation",
+          render: (row) => (
+            <Link
+              className="font-medium text-teal-700"
+              to={`/quotations/${row.id}`}
+            >
+              {row.quotation_no}
+            </Link>
+          ),
+        },
+        {
+          key: "company_name",
+          label: "Customer",
+
+          render: (row) => {
+            const services = row.service_items
+              ? row.service_items.split("||")
+              : [];
+
+            return (
+              <div>
+                {/* CUSTOMER NAME */}
+                <div className="font-medium text-slate-900">
+                  {row.company_name}
+
+                  {row.contact_person && (
+                    <span className="ml-1 font-normal text-slate-500">
+                      ({row.contact_person})
+                    </span>
+                  )}
+                </div>
+
+                {/* SERVICE ITEMS */}
+                {services.length > 0 && (
+                  <div className="mt-1 pl-4 text-sm text-slate-500">
+                    {services.map((service, index) => (
+                      <div key={index}>- {service}</div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          },
+        },
+        {
+          key: "quotation_date",
+          label: "Date",
+          render: (row) => date(row.quotation_date),
+        },
+        {
+          key: "grand_total",
+          label: "Total",
+          render: (row) => money(row.grand_total),
+        },
+        {
+          key: "status",
+          label: "Status",
+          render: (row) => <StatusBadge status={row.status} />,
+        },
+      ]}
+      getViewPath={(row) => `/quotations/${row.id}`}
+      rowActions={(row) => (
+        <div className="flex items-center gap-1">
+          {!isConvertedQuotation(row) && (
+            <Link
+              title="Edit"
+              to={`/quotations/${row.id}/edit`}
+              className="rounded p-1.5 text-slate-500 hover:bg-slate-100"
+            >
+              <Pencil size={16} />
+            </Link>
+          )}
+          <button
+            title="Export PDF"
+            onClick={() => exportPdf(row)}
+            className="rounded p-1.5 text-teal-700 hover:bg-teal-50"
+          >
+            <FileDown size={16} />
+          </button>
+        </div>
+      )}
+      canDeleteRow={(row) => !isConvertedQuotation(row)}
+      extraAction={
+        <Link
+          to="/quotations/new"
+          className="inline-flex items-center gap-2 rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white"
+        >
+          <FilePlus2 size={16} /> New quotation
+        </Link>
+      }
+    />
+  );
+}

@@ -1,0 +1,61 @@
+{
+"select * from recurring_invoices ri where recurring_id =21": [
+	{
+		"id" : 187,
+		"recurring_id" : 21,
+		"invoice_no" : null,
+		"billing_cycle" : "monthly",
+		"custom_billing_cycle" : null,
+		// "next_invoice_date" : "2026-07-27", remove
+		"auto_generate" : 1,
+		// "last_generated_at" : null, remove
+		// "status" : "pending", remove 
+		"subtotal" : 2435.0,
+		"discount" : 0.0,
+		"discount_is_percent" : 0,
+		"cgst_total" : 219.15,
+		"sgst_total" : 219.15,
+		"igst_total" : 0.0,
+		"tax_total" : 438.3,
+		"grand_total" : 2873.0,
+		"notes" : "",
+		"created_at" : "2026-05-27 06:11:57",
+		"recurring_invoice_no" : "REC-2627-0026",
+		"is_stopped" : 0,
+		"stopped_reason" : null,
+		"start_date" : "2026-06-27",
+		"end_date" : null,
+		"is_deleted" : 0,
+		"is_active" : 1
+	}
+]}
+
+
+
+{
+"select * from recurring_invoice_history rih  where recurring_invoice_id =185": [
+	{
+		"id" : 68,
+		"recurring_invoice_id" : 185,
+		"payment_id" : 77,
+		"invoice_start_date" : "2026-05-27",
+		"next_invoice_date" : "2026-06-27",
+		"due_date" : "2026-06-27",
+		"action_type" : "payment_received",
+		"action_status" : null,
+		"action_notes" : "Payment received: bank_transfer",
+		"amount" : 2873.0,
+		"payment_date" : "2026-05-27",
+		"pending_amount" : 0.0,
+		"overdue_days" : 0,
+		"collection_status" : "completed", //same ahe 
+		"created_by" : null,
+		"created_at" : "2026-05-27 06:11:57",
+		"paid_on_date" : "2026-05-27",
+		"paid_amount" : 2873.0
+
+
+		// "last_generated_at" : null, add this one thats it 
+
+	}
+]}
