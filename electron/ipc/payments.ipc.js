@@ -47,8 +47,8 @@ LEFT JOIN invoices i
 LEFT JOIN recurring_invoices ri
   ON ri.id = COALESCE(p.recurring_invoice_id, i.recurring_id)
 
-JOIN customers c
-  ON c.id = p.customer_id
+JOIN contacts c
+  ON c.id = p.contact_id AND c.is_customer = 1
 
 LEFT JOIN bank_accounts ba
   ON ba.id = p.bank_account_id

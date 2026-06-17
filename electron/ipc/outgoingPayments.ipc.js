@@ -17,7 +17,7 @@ module.exports = (ipcMain) => {
         ec.name AS category_name,
         ba.account_name AS bank_account_name
       FROM outgoing_payments op
-      LEFT JOIN vendors v ON v.id = op.vendor_id
+      LEFT JOIN contacts v ON v.id = op.contact_id
       LEFT JOIN purchases p ON p.id = op.purchase_id
       LEFT JOIN expenses e ON e.id = op.expense_id
       LEFT JOIN expense_categories ec ON ec.id = op.category_id
@@ -39,7 +39,7 @@ module.exports = (ipcMain) => {
         ec.name AS category_name,
         ba.account_name AS bank_account_name
       FROM outgoing_payments op
-      LEFT JOIN vendors v ON v.id = op.vendor_id
+      LEFT JOIN contacts v ON v.id = op.contact_id
       LEFT JOIN purchases p ON p.id = op.purchase_id
       LEFT JOIN expenses e ON e.id = op.expense_id
       LEFT JOIN expense_categories ec ON ec.id = op.category_id
@@ -49,7 +49,7 @@ module.exports = (ipcMain) => {
   }));
 
   ipcMain.handle('outgoingPayments:update', ok(({ id, ...data }) => {
-    const allowed = ['payment_date', 'vendor_id', 'category_id', 'amount', 'mode', 'bank_account_id', 'reference_no', 'notes'];
+    const allowed = ['payment_date', 'contact_id', 'category_id', 'amount', 'mode', 'bank_account_id', 'reference_no', 'notes'];
     return update('outgoing_payments', id, data, allowed);
   }));
 

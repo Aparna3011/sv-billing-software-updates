@@ -8,6 +8,7 @@ module.exports = ipcMain => {
   ipcMain.handle('invoices:update', ok(payload => invoices.updateInvoice(payload)));
   ipcMain.handle('invoices:cancel', ok(({ id, role }) => invoices.cancelInvoice(id, role)));
   ipcMain.handle('invoices:listByCustomer', ok(({ customerId }) => invoices.listInvoicesByCustomer(customerId)));
+  ipcMain.handle('invoices:listByCustomer', ok(({ customerId }) => invoices.listInvoicesByContact(customerId)));
   ipcMain.handle('invoices:delete', ok(({ id }) => {
     const { getDb } = require('../db/database');
     const db = getDb();

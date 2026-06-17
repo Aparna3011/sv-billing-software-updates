@@ -2,6 +2,7 @@ import GenericResourcePage from "../_shared/GenericResourcePage";
 import { modules } from "../../utils/api";
 import { GST_TREATMENT_OPTIONS } from "../../utils/constants";
 
+ 
 export default function CustomerList() {
   return (
     <GenericResourcePage

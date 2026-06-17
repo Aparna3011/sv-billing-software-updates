@@ -69,9 +69,8 @@ const blankItem = {
 };
 
 const defaultForm = {
-  customer_id: "",
-  invoice_id: "",
-  templates: [
+  contact_id: "",
+  templates: [ // Use contact_id
     {
       recurring_invoice_no: "",
 
@@ -290,7 +289,7 @@ export default function RecurringForm({ recordId }) {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const loadCustomerInvoices = async (customerId) => {
     if (!customerId) {
-      setCustomerInvoices([]);
+      setCustomerInvoices([]); // Use contactId
 
       return;
     }
@@ -325,9 +324,8 @@ export default function RecurringForm({ recordId }) {
         if (!recurring) throw new Error("Recurring record not found");
 
         setForm({
-          customer_id: recurring.customer_id || "",
+          contact_id: recurring.contact_id || "",
           invoice_id: recurring.invoice_id || "",
-
           templates:
             (recurring.templates || [])
               .filter((t) => t.is_active === 1)
@@ -365,11 +363,13 @@ export default function RecurringForm({ recordId }) {
               })) || [],
         });
 
-        loadCustomerInvoices(recurring.customer_id);
+        loadCustomerInvoices(recurring.contact_id);
+        loadCustomerInvoices(recurring.contact_id); // Use contact_id
 
         const invoice = recurring.invoice_id
           ? {
               id: recurring.invoice_id,
+              id: recurring.invoice_id, // Use contact_id
               invoice_no: recurring.invoice_no,
               invoice_date: recurring.invoice_date,
               status: recurring.invoice_status,
@@ -384,14 +384,16 @@ export default function RecurringForm({ recordId }) {
       .finally(() => setIsLoading(false));
   }, [recordId]);
   useEffect(() => {
-    if (form.customer_id) {
-      loadCustomerInvoices(form.customer_id);
+    if (form.contact_id) { // Use contact_id
+      loadCustomerInvoices(form.contact_id);
     }
-  }, [form.customer_id]);
+  }, [form.contact_id]);
+   // Use contact_id
 
   const selectedCustomer = useMemo(() => {
-    return customers.find((c) => Number(c.id) === Number(form.customer_id));
-  }, [customers, form.customer_id]);
+    return customers.find((c) => Number(c.id) === Number(form.contact_id));
+  }, [customers, form.contact_id]);
+
   const [settings, setSettings] = useState(null);
   // Company GST state
   const companyState = "Maharashtra";
@@ -437,7 +439,8 @@ export default function RecurringForm({ recordId }) {
   const handleCustomerAdded = async (saved) => {
     const updatedCustomers = await modules.customers.list();
     setCustomers(updatedCustomers);
-    updateForm("customer_id", saved.id);
+    updateForm("contact_id", saved.id);
+    updateForm("contact_id", saved.id); // Use contact_id
     await loadCustomerInvoices(saved.id);
     setCustomerPopup(false);
   };
@@ -445,9 +448,8 @@ export default function RecurringForm({ recordId }) {
   async function save(event) {
     event.preventDefault();
 
-    try {
-      if (!form.customer_id) {
-        toast.error("Please select a customer");
+    try { // Use contact_id
+      if (!form.contact_id) { toast.error("Please select a customer");
         return;
       }
 
@@ -475,7 +477,7 @@ export default function RecurringForm({ recordId }) {
       }
 
       const payload = {
-        customer_id: Number(form.customer_id),
+        contact_id: Number(form.contact_id), // Use contact_id
         invoice_id: form.invoice_id ? Number(form.invoice_id) : null,
         templates: validatedTemplates.map((template, index) => {
           const totals = getItemsTotals(
@@ -611,13 +613,13 @@ export default function RecurringForm({ recordId }) {
             <CustomerSelect
               name="customer"
               customers={customers}
-              value={form.customer_id}
+              value={form.contact_id}
               onChange={async (customerId) => {
-                updateForm("customer_id", customerId);
+                updateForm("contact_id", customerId);
 
                 await loadCustomerInvoices(customerId);
               }}
-            />
+             />
           </div>
 
           <div>

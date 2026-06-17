@@ -112,7 +112,7 @@ const normalizeDiscountValue = (value, isPercent, subtotal) => {
 };
 
 const getDefaultForm = (docType) => ({
-  customer_id: "",
+  contact_id: "",
   invoice_date: today,
   quotation_date: today,
   valid_until: "",
@@ -224,7 +224,7 @@ export default function DocumentForm({ type, recordId }) {
         setForm({
           ...getDefaultForm(type),
           ...doc,
-          customer_id: doc.customer_id || "",
+          contact_id: doc.contact_id || "",
           discount: doc.discount ?? 0,
           discount_is_percent:
             doc.discount_is_percent === true ||
@@ -349,7 +349,7 @@ export default function DocumentForm({ type, recordId }) {
 
         items: normalizedItems,
 
-        customer_id: Number(form.customer_id),
+        contact_id: Number(form.contact_id),
 
         discount: normalizeDiscountValue(
           form.discount,
@@ -445,7 +445,7 @@ export default function DocumentForm({ type, recordId }) {
     setCustomers(updatedCustomers);
     setForm((prev) => ({
       ...prev,
-      customer_id: saved.id,
+      contact_id: saved.id,
     }));
     setCustomerPopup(false);
   };
@@ -531,11 +531,11 @@ export default function DocumentForm({ type, recordId }) {
             <CustomerSelect
               name="customer"
               customers={customers}
-              value={form.customer_id}
-              onChange={(customer_id) =>
+              value={form.contact_id}
+              onChange={(contact_id) =>
                 setForm((prev) => ({
                   ...prev,
-                  customer_id,
+                  contact_id,
                 }))
               }
             />
@@ -557,10 +557,10 @@ export default function DocumentForm({ type, recordId }) {
               }))
             }
           />
-          {form.is_gst_enabled && form.customer_id && (
+          {form.is_gst_enabled && form.contact_id && (
             <FormInput
               label="Customer GSTIN"
-              value={customers.find(c => c.id === form.customer_id)?.gstin || ''}
+              value={customers.find(c => c.id === form.contact_id)?.gstin || ''}
               disabled // Assuming it's read-only on the form
               className="text-slate-600"
             />

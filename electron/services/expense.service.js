@@ -15,28 +15,28 @@ function lookupName(db, table, id, column) {
   return row?.[column] || "";
 }
 
-function normalize(payload = {}, fallback = {}) {
+function normalize(payload = {}, fallback = {}) { // This is fine
   const db = getDb();
   const clean = { ...fallback, ...payload };
   clean.expense_date = clean.expense_date || today();
 
-  // Handle prefixed vendor_id from frontend (e.g., "v_1" or "c_5")
-  if (typeof clean.vendor_id === 'string') {
-    if (clean.vendor_id.startsWith('v_')) {
-      clean.vendor_id = Number(clean.vendor_id.substring(2)); // Extract numeric ID for vendor
-    } else if (clean.vendor_id.startsWith('c_')) {
-      clean.vendor_id = null; // Customers are not stored in vendor_id column in expenses table
+  // Handle prefixed contact_id from frontend (e.g., "v_1" or "c_5")
+  if (typeof clean.contact_id === 'string') { // MUST CHANGE
+    if (clean.contact_id.startsWith('v_')) { // MUST CHANGE
+      clean.contact_id = Number(clean.contact_id.substring(2)); // Extract numeric ID for vendor // MUST CHANGE
+    } else if (clean.contact_id.startsWith('c_')) { // MUST CHANGE
+      clean.contact_id = null; // Customers are not stored in contact_id column in expenses table // MUST CHANGE
       // Ensure vendor name is captured if it's a customer
       clean.vendor = clean.vendor || payload.vendor;
     } else {
-      clean.vendor_id = Number(clean.vendor_id); // Fallback for raw numeric ID
+      clean.contact_id = Number(clean.contact_id); // Fallback for raw numeric ID // MUST CHANGE
     }
   } else {
-    clean.vendor_id = clean.vendor_id ? Number(clean.vendor_id) : null;
+    clean.contact_id = clean.contact_id ? Number(clean.contact_id) : null; // MUST CHANGE
   }
   clean.bank_account_id = clean.bank_account_id ? Number(clean.bank_account_id) : null;
-  clean.vendor =
-    lookupName(db, "vendors", clean.vendor_id, "company_name") || 
+  clean.vendor = // This is fine
+    lookupName(db, "contacts", clean.contact_id, "company_name") || // MUST CHANGE
     String(clean.vendor || "").trim();
 
   // Handle GST enabled flag
@@ -60,7 +60,7 @@ function normalize(payload = {}, fallback = {}) {
   if (!items.length) throw new Error("At least one expense item is required");
 
   const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
-  const vendor = clean.vendor_id ? db.prepare("SELECT * FROM vendors WHERE id = ?").get(clean.vendor_id) : null;
+  const vendor = clean.contact_id ? db.prepare("SELECT * FROM contacts WHERE id = ?").get(clean.contact_id) : null;
   const totals = totalsForItems(items, company, { 
     state: vendor?.state || company?.state || "", 
     gst_treatment: 'registered' 
@@ -97,7 +97,7 @@ function normalize(payload = {}, fallback = {}) {
   clean.attachment_path = clean.attachment_path || "";
   clean.notes = clean.notes || "";
 
-  if (!clean.vendor_id && !clean.vendor) throw new Error("Vendor is required");
+  if (!clean.contact_id && !clean.vendor) throw new Error("Vendor is required");
   if (!clean.category_id && !clean.category) throw new Error("Category is required");
   if (clean.amount <= 0) throw new Error("Amount must be greater than zero");
   return clean;
@@ -149,16 +149,16 @@ function listExpenses() {
         bt.id AS linked_bank_transaction_id,
         bt.balance_after
       FROM expenses e
-      LEFT JOIN vendors v ON v.id = e.vendor_id
+      LEFT JOIN contacts v ON v.id = e.contact_id
       LEFT JOIN expense_categories ec ON ec.id = e.category_id
-      LEFT JOIN bank_accounts ba ON ba.id = e.bank_account_id
-      LEFT JOIN bank_transactions bt ON bt.id = e.bank_transaction_id
+      LEFT JOIN bank_accounts ba ON ba.id = e.bank_account_id // This is fine
+      LEFT JOIN bank_transactions bt ON bt.id = e.bank_transaction_id // This is fine
       WHERE e.is_deleted = 0
       ORDER BY e.expense_date DESC, e.id DESC
     `,
     )
     .all()
-    .map(row => ({
+    .map(row => ({ // This is fine
       ...row,
       items: [{
         description: row.category_name || row.category,
@@ -190,8 +190,8 @@ function getExpense(id) {
       ba.account_name AS bank_account_name,
       bt.id AS linked_bank_transaction_id,
       bt.balance_after
-    FROM expenses e
-    LEFT JOIN vendors v ON v.id = e.vendor_id
+    FROM expenses e // This is fine
+    LEFT JOIN contacts v ON v.id = e.contact_id AND v.is_vendor = 1 // MUST CHANGE
     LEFT JOIN expense_categories ec ON ec.id = e.category_id
     LEFT JOIN bank_accounts ba ON ba.id = e.bank_account_id
     LEFT JOIN bank_transactions bt ON bt.id = e.bank_transaction_id
@@ -302,15 +302,15 @@ function createExpense(payload) {
       .prepare(
         `
         INSERT INTO expenses (
-        expense_no, expense_date, vendor, vendor_id, category, category_id, is_gst_enabled,
+        expense_no, expense_date, vendor, contact_id, category, category_id, is_gst_enabled, // MUST CHANGE
           amount, subtotal, gst_rate, gst_amount, tax_total, cgst_total, 
           sgst_total, igst_total, total_amount, payment_mode,
           reference_no, notes, attachment_path, bank_account_id, status,
           paid_amount, balance_due
         )
         VALUES (
-        @expense_no, @expense_date, @vendor, @vendor_id, @category, @category_id, @is_gst_enabled,
-          @amount, @subtotal, @gst_rate, @gst_amount, @tax_total, @cgst_total,
+        @expense_no, @expense_date, @vendor, @contact_id, @category, @category_id, @is_gst_enabled,
+          @amount, @subtotal, @gst_rate, @gst_amount, @tax_total, @cgst_total, // This is fine
           @sgst_total, @igst_total, @total_amount, @payment_mode,
           @reference_no, @notes, @attachment_path, @bank_account_id, @status,
           @paid_amount, @balance_due
@@ -325,7 +325,7 @@ function createExpense(payload) {
     if (clean.paid_amount > 0) {
       recordExpensePayment({
         expense_id: info.lastInsertRowid,
-        vendor_id: clean.vendor_id,
+        contact_id: clean.contact_id, // MUST CHANGE
         payment_date: clean.expense_date,
         amount: clean.paid_amount,
         mode: clean.payment_mode,
@@ -381,8 +381,8 @@ function updateExpense(payload) {
       UPDATE expenses
       SET expense_no = @expense_no,
           expense_date = @expense_date,
-          vendor = @vendor,
-          vendor_id = @vendor_id,
+          vendor = @vendor, // This is fine
+          contact_id = @contact_id,
           category = @category,
           category_id = @category_id,
           is_gst_enabled = @is_gst_enabled,
@@ -426,7 +426,7 @@ function recordExpensePayment(payload) {
   const db = getDb();
   return db.transaction(() => {
     const expenseId = Number(payload.expense_id || payload.id);
-    const exp = db.prepare("SELECT subtotal, tax_total, total_amount, paid_amount, balance_due, status, vendor, vendor_id, category_id, category, expense_no FROM expenses WHERE id = ? AND is_deleted = 0").get(expenseId);
+    const exp = db.prepare("SELECT subtotal, tax_total, total_amount, paid_amount, balance_due, status, vendor, contact_id, category_id, category, expense_no FROM expenses WHERE id = ? AND is_deleted = 0").get(expenseId);
     if (!exp) throw new Error("Expense not found");
 
     const amount = round(payload.amount || 0);
@@ -451,15 +451,15 @@ function recordExpensePayment(payload) {
     accounting.checkNarrationRequirement(db, payload.notes);
 
     const paymentDate = payload.payment_date || today();
-    const paymentNo = numbering.nextPurchasePaymentNo(new Date(paymentDate));
+    const paymentNo = numbering.nextPurchasePaymentNo(new Date(paymentDate)); // This is fine
     const bankAccountId = payload.bank_account_id ? Number(payload.bank_account_id) : null;
 
     const info = db.prepare(`
-      INSERT INTO outgoing_payments (expense_id, vendor_id, category_id, payment_no, payment_date, amount, mode, reference_no, notes, bank_account_id)
+      INSERT INTO outgoing_payments (expense_id, contact_id, category_id, payment_no, payment_date, amount, mode, reference_no, notes, bank_account_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(expenseId, exp.vendor_id, exp.category_id, paymentNo, paymentDate, amount, payload.mode, payload.reference_no || '', payload.notes || '', bankAccountId);
+    `).run(expenseId, exp.contact_id, exp.category_id, paymentNo, paymentDate, amount, payload.mode, payload.reference_no || '', payload.notes || '', bankAccountId);
 
-    if (bankAccountId) {
+    if (bankAccountId) { // This is fine
       const bankTx = accounting.createBankTransaction(db, {
         bank_account_id: bankAccountId,
         transaction_date: paymentDate,

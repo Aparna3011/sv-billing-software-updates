@@ -3,16 +3,16 @@ const { ok } = require("./helpers");
 const recurring = require("../services/recurring.service");
 const activity = require("../services/activitylog.service");
 
-const allowed = ["customer_id", "invoice_id"];
+const allowed = ["contact_id", "invoice_id"];
 
 function normalize(data) {
   const clean = { ...data };
 
-  clean.customer_id = Number(clean.customer_id);
+  clean.contact_id = Number(clean.contact_id);
 
   clean.invoice_id = clean.invoice_id ? Number(clean.invoice_id) : null;
 
-  if (!clean.customer_id) {
+  if (!clean.contact_id) {
     throw new Error("Please select a customer");
   }
 
@@ -31,7 +31,7 @@ module.exports = (ipcMain) => {
          SELECT
   r.id,
 
-  r.customer_id,
+  r.contact_id,
 
   (
     SELECT collection_status 
@@ -111,8 +111,8 @@ END
 
 FROM recurring r
 
-JOIN customers c
-  ON c.id = r.customer_id
+JOIN contacts c
+  ON c.id = r.contact_id AND c.is_customer = 1
 
 LEFT JOIN recurring_invoices ri
   ON ri.recurring_id = r.id
@@ -351,8 +351,8 @@ ORDER BY r.created_at DESC
         JOIN recurring r
           ON r.id = ri.recurring_id
 
-        JOIN customers c
-          ON c.id = r.customer_id
+        JOIN contacts c
+          ON c.id = r.contact_id
 
       JOIN company co
         ON co.id = 1

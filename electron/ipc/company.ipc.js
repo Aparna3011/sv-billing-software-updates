@@ -67,6 +67,7 @@ module.exports = ipcMain => {
 
   'bank_name',
   'bank_account',
+  'bank_branch',
   'ifsc',
   'upi_id',
 

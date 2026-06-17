@@ -24,9 +24,9 @@ function metrics() {
     monthlyRevenue: db.prepare("SELECT COALESCE(SUM(amount),0) total FROM incoming_payments WHERE strftime('%Y-%m', payment_date) = strftime('%Y-%m', 'now')").get().total,
     outstanding: db.prepare("SELECT COALESCE(SUM(balance_due),0) total FROM invoices WHERE is_deleted = 0 AND status NOT IN ('paid','cancelled')").get().total,
     unpaidInvoices: db.prepare("SELECT COUNT(*) total FROM invoices WHERE is_deleted = 0 AND balance_due > 0 AND status != 'cancelled'").get().total,
-    customers: db.prepare('SELECT COUNT(*) total FROM customers WHERE is_deleted = 0').get().total,
+    customers: db.prepare('SELECT COUNT(*) total FROM contacts WHERE is_deleted = 0 AND is_customer = 1').get().total,
     activeRecurringClients: db.prepare(`
-      SELECT COUNT(DISTINCT r.customer_id) total 
+      SELECT COUNT(DISTINCT r.contact_id) total 
       FROM recurring r 
       JOIN recurring_invoices ri ON ri.recurring_id = r.id 
       JOIN (
@@ -43,8 +43,8 @@ function metrics() {
     ...recurringOverview,
     recentInvoices: db.prepare(`
       SELECT i.id, i.invoice_no, i.invoice_date, i.grand_total, i.status, c.company_name
-      FROM invoices i JOIN customers c ON c.id = i.customer_id
-      WHERE i.is_deleted = 0 ORDER BY i.id DESC LIMIT 8
+      FROM invoices i JOIN contacts c ON c.id = i.contact_id
+      WHERE i.is_deleted = 0 AND c.is_customer = 1 ORDER BY i.id DESC LIMIT 8
     `).all(),
     overdueRecurrings: db.prepare(`
       SELECT 
@@ -58,7 +58,7 @@ function metrics() {
       FROM recurring_invoices ri
       JOIN (${latestHistorySub}) h ON ri.id = h.recurring_invoice_id
       JOIN recurring r ON r.id = ri.recurring_id
-      JOIN customers c ON c.id = r.customer_id
+      JOIN contacts c ON c.id = r.contact_id AND c.is_customer = 1
       WHERE ri.is_deleted = 0 AND ri.is_stopped = 0 AND h.collection_status = 'overdue'
       ORDER BY h.overdue_days DESC
       LIMIT 10
@@ -74,7 +74,7 @@ function metrics() {
         r.id as recurring_id
       FROM recurring_invoices ri 
       JOIN recurring r ON r.id = ri.recurring_id
-      JOIN customers c ON c.id = r.customer_id
+      JOIN contacts c ON c.id = r.contact_id AND c.is_customer = 1
       JOIN (${latestHistorySub}) h ON h.recurring_invoice_id = ri.id
       WHERE ri.is_deleted = 0 AND ri.is_stopped = 0 AND h.collection_status != 'completed'
         AND h.next_invoice_date BETWEEN date('now', 'localtime') AND date('now', '+7 days', 'localtime')

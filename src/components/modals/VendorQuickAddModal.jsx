@@ -55,7 +55,7 @@ export default function VendorQuickAddModal({ isOpen, onClose, onSuccess }) {
   });
 
   const [gstTreatments, setGstTreatments] = useState([]); // Assuming this is used for FormSelect options
-  const [countryCode, setCountryCode] = useState("");
+  const [countryCode, setCountryCode] = useState(""); // Use contact's country
   const [stateCode, setStateCode] = useState("");
 
   const countries = Country.getAllCountries();
@@ -74,7 +74,7 @@ export default function VendorQuickAddModal({ isOpen, onClose, onSuccess }) {
 
   async function onSubmit(data) {
     try {
-      const newVendor = await modules.vendors.create(data);
+      const newVendor = await modules.vendors.create({ ...data, is_vendor: 1, is_customer: 0 }); // Create a contact with is_vendor flag
       toast.success("Vendor created successfully!");
       onSuccess(newVendor); // Pass the new vendor object back to the parent
       onClose();

@@ -413,6 +413,8 @@ export default function CompanyInfo() {
 
             <FormInput label="Account Number" {...register("bank_account")} />
 
+            <FormInput label="Branch Name" {...register("bank_branch")} />
+
             <FormInput label="IFSC Code" {...register("ifsc")} />
 
             <FormInput label="UPI ID" {...register("upi_id")} />

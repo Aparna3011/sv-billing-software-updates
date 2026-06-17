@@ -179,8 +179,8 @@ function syncRecurringLifecycle(db, recurringInvoiceId, actionData = {}) {
     .prepare(
       `
       SELECT 
-        ri.*, 
-        r.customer_id,
+        ri.*, // This is fine
+        r.contact_id, // Already updated in previous turn
         COALESCE(ri.start_date, date('now')) as current_cycle_start
       FROM recurring_invoices ri 
       JOIN recurring r ON r.id = ri.recurring_id 
@@ -425,7 +425,7 @@ function getRecurring(id, light = false) {
   SELECT
     r.*,
 
-    c.company_name,
+    c.company_name, // This is fine
     c.contact_person,
     c.email,
     c.phone,
@@ -446,8 +446,8 @@ function getRecurring(id, light = false) {
 
   FROM recurring r
 
-  LEFT JOIN customers c
-    ON c.id = r.customer_id
+  LEFT JOIN contacts c // Already updated in previous turn
+    ON c.id = r.contact_id AND c.is_customer = 1 // Already updated in previous turn
 
   LEFT JOIN company co
     ON co.id = 1
@@ -632,15 +632,15 @@ function getRecurring(id, light = false) {
           ) AS cycle_payment_id
         FROM recurring_invoice_history rih
         JOIN recurring_invoices ri ON ri.id = rih.recurring_invoice_id
-        LEFT JOIN incoming_payments hp ON hp.id = rih.payment_id
-        LEFT JOIN bank_transactions hbt ON hbt.id = hp.bank_transaction_id
+        LEFT JOIN incoming_payments hp ON hp.id = rih.payment_id // This is fine
+        LEFT JOIN bank_transactions hbt ON hbt.id = hp.bank_transaction_id // This is fine
         WHERE ri.recurring_id = ?
           AND (
             rih.action_type <> 'payment_received'
             OR (
               COALESCE(hp.is_deleted, 0) = 0
               AND (
-                hp.bank_transaction_id IS NULL
+                hp.bank_transaction_id IS NULL // This is fine
                 OR COALESCE(hbt.is_deleted, 0) = 0
               )
               AND rih.id = (
@@ -697,11 +697,11 @@ function getPlan(id) {
     SELECT 
       ri.*, 
       ri.recurring_invoice_no,
-      r.customer_id, 
-      c.company_name
+      r.contact_id, // Already updated in previous turn
+      c.company_name // This is fine
     FROM recurring_invoices ri
     JOIN recurring r ON r.id = ri.recurring_id
-    JOIN customers c ON c.id = r.customer_id
+    JOIN contacts c ON c.id = r.contact_id AND c.is_customer = 1 // Already updated in previous turn
     WHERE ri.id = ?
   `,
     )
@@ -730,10 +730,10 @@ function createRecurring(data) {
   const db = getDb();
 
   const tx = db.transaction(() => {
-    const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
+    const company = db.prepare("SELECT * FROM company WHERE id = 1").get(); // This is fine
     const customer = db
-      .prepare("SELECT * FROM customers WHERE id = ?")
-      .get(data.customer_id);
+      .prepare("SELECT * FROM contacts WHERE id = ? AND is_customer = 1")
+      .get(data.contact_id);
     const sameState =
       String(company?.state || "")
         .trim()
@@ -750,19 +750,19 @@ function createRecurring(data) {
     const result = db
       .prepare(
         `
-       INSERT INTO recurring (
-  customer_id,
-  invoice_id
-)
+       INSERT INTO recurring ( // This is fine
+  contact_id, // Already updated in previous turn
+  invoice_id // This is fine
+) // This is fine
 
-VALUES (
-  @customer_id,
-  @invoice_id
-)
+VALUES ( // This is fine
+  @contact_id, // Already updated in previous turn
+  @invoice_id // This is fine
+) // This is fine
       `,
       )
       .run({
-        customer_id: data.customer_id,
+        contact_id: data.contact_id, // Already updated in previous turn
 
         invoice_id: data.invoice_id || null,
       });
@@ -998,10 +998,10 @@ function updateRecurring(id, data) {
   const db = getDb();
 
   const tx = db.transaction(() => {
-    const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
+    const company = db.prepare("SELECT * FROM company WHERE id = 1").get(); // This is fine
     const customer = db
-      .prepare("SELECT * FROM customers WHERE id = ?")
-      .get(data.customer_id);
+      .prepare("SELECT * FROM contacts WHERE id = ? AND is_customer = 1")
+      .get(data.contact_id);
     const sameState =
       String(company?.state || "")
         .trim()
@@ -1022,15 +1022,15 @@ function updateRecurring(id, data) {
       UPDATE recurring
 
 SET
-  customer_id = @customer_id,
-  invoice_id = @invoice_id
+  contact_id = @contact_id, // Already updated in previous turn
+  invoice_id = @invoice_id // This is fine
 
-WHERE id = @id
+WHERE id = @id // This is fine
     `,
     ).run({
       id,
 
-      customer_id: data.customer_id,
+      contact_id: data.contact_id, // Already updated in previous turn
 
       invoice_id: data.invoice_id || null,
     });
@@ -1364,7 +1364,7 @@ function generateDueInvoices() {
       `
       SELECT
   ri.*,
-  r.customer_id
+  r.contact_id // Already updated in previous turn
 
   FROM recurring_invoices ri
   JOIN recurring r ON r.id = ri.recurring_id
@@ -1404,7 +1404,7 @@ function generateDueInvoices() {
       .all(row.id);
 
     const invoice = createInvoice({
-      customer_id: row.customer_id,
+      contact_id: row.contact_id, // Already updated in previous turn
       is_recurring: true,
       recurring_id: row.id,
       is_gst_enabled: row.is_gst_enabled,
@@ -1658,9 +1658,9 @@ function listAllHistory() {
     SELECT
       rih.*,
       ri.recurring_invoice_no,
-      ri.grand_total,
+  ri.grand_total, // This is fine
       r.id AS recurring_id,
-      r.customer_id,
+  r.contact_id, // MUST CHANGE
 
       c.company_name,
       c.contact_person,
@@ -1679,8 +1679,8 @@ function listAllHistory() {
     JOIN recurring r
       ON r.id = ri.recurring_id
 
-    JOIN customers c
-      ON c.id = r.customer_id
+    JOIN contacts c // Already updated in previous turn
+      ON c.id = r.contact_id AND c.is_customer = 1 // Already updated in previous turn
 
     JOIN company co
       ON co.id = 1

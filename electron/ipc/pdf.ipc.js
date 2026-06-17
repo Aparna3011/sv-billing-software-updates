@@ -526,7 +526,7 @@ SELECT r.*,
        c.country,
        co.state as company_state
        FROM recurring r
-          JOIN customers c ON c.id = r.customer_id
+          JOIN contacts c ON c.id = r.contact_id
           CROSS JOIN company co ON co.id = 1
           WHERE r.id = ?
         `,
@@ -663,7 +663,7 @@ SELECT r.*,
             roundAmount(Number(t.grand_total || 0) - tPaid),
           );
 
-          // // Debug log for calculation auditing
+          // Debug log for calculation auditing
           // console.log({
           //   recurring_invoice_id: t.id,
           //   invoice_start_date: cycleStartDate,
@@ -859,7 +859,7 @@ function loadRecurringPlanContext(db, templateId, recurringId) {
       SELECT
         ri.*,
         r.id AS recurring_id,
-        r.customer_id,
+        r.contact_id,
 
         c.company_name,
         c.contact_person,
@@ -874,8 +874,8 @@ function loadRecurringPlanContext(db, templateId, recurringId) {
       FROM recurring_invoices ri
       JOIN recurring r
         ON r.id = ri.recurring_id
-      JOIN customers c
-        ON c.id = r.customer_id
+      JOIN contacts c
+        ON c.id = r.contact_id
       WHERE ri.id = ?
         AND (? IS NULL OR r.id = ?)
     `,
@@ -1198,7 +1198,7 @@ function buildExpenseDocument(db, id) {
         co.invoice_footer,
         co.tagline
       FROM expenses e
-      LEFT JOIN vendors v ON v.id = e.vendor_id
+      LEFT JOIN contacts v ON v.id = e.contact_id
       LEFT JOIN expense_categories ec ON ec.id = e.category_id
       LEFT JOIN bank_accounts ba ON ba.id = e.bank_account_id
       JOIN company co ON co.id = 1
@@ -1276,7 +1276,7 @@ function buildPurchaseDocument(db, id) {
         co.invoice_footer,
         co.tagline
       FROM purchases p
-      LEFT JOIN vendors v ON v.id = p.vendor_id
+      LEFT JOIN contacts v ON v.id = p.contact_id
       LEFT JOIN bank_accounts ba ON ba.id = p.bank_account_id
       JOIN company co ON co.id = 1
       WHERE p.id = ?
@@ -1367,8 +1367,8 @@ c.country,
 
     FROM invoices i
 
-    JOIN customers c
-      ON c.id = i.customer_id
+    JOIN contacts c
+      ON c.id = i.contact_id
 
     JOIN company co
       ON co.id = 1
@@ -1518,8 +1518,8 @@ function getQuotationPdfData(id) {
 
     FROM quotations q
 
-    JOIN customers c
-      ON c.id = q.customer_id
+    JOIN contacts c
+      ON c.id = q.contact_id
 
     JOIN company co
       ON co.id = 1

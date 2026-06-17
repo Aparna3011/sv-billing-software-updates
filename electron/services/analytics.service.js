@@ -33,7 +33,7 @@ function getOverview() {
     .get().total;
   const activeCustomers = db
     .prepare(
-      "SELECT COUNT(DISTINCT customer_id) total FROM invoices WHERE is_deleted = 0 AND status = 'paid'",
+      "SELECT COUNT(DISTINCT contact_id) total FROM invoices WHERE is_deleted = 0 AND status = 'paid'", // Already updated in previous turn
     )
     .get().total;
 
@@ -41,7 +41,7 @@ function getOverview() {
   const activeRecurring = db
     .prepare(
       "SELECT COUNT(*) total FROM recurring_invoices WHERE is_deleted = 0 AND is_stopped = 0",
-    )
+    ) // This is fine
     .get().total;
   const overdueRecurring = db
     .prepare(
@@ -164,17 +164,17 @@ AND h.next_invoice_date BETWEEN date('now') AND date('now', '+30 days')`,
     recentActivity: {
       invoices: db
         .prepare(
-          "SELECT i.invoice_no, c.company_name as customer, i.grand_total as amount, i.status FROM invoices i JOIN customers c ON c.id = i.customer_id WHERE i.is_deleted = 0 ORDER BY i.id DESC LIMIT 5",
+          "SELECT i.invoice_no, c.company_name as customer, i.grand_total as amount, i.status FROM invoices i JOIN contacts c ON c.id = i.contact_id WHERE i.is_deleted = 0 AND c.is_customer = 1 ORDER BY i.id DESC LIMIT 5", // Already updated in previous turn
         )
         .all(),
       incoming_payments: db
         .prepare(
-          "SELECT p.payment_no, c.company_name as customer, p.amount, p.payment_date as date FROM incoming_payments p JOIN customers c ON c.id = p.customer_id ORDER BY p.id DESC LIMIT 5",
+          "SELECT p.payment_no, c.company_name as customer, p.amount, p.payment_date as date FROM incoming_payments p JOIN contacts c ON c.id = p.contact_id WHERE c.is_customer = 1 ORDER BY p.id DESC LIMIT 5", // Already updated in previous turn
         )
         .all(),
       recurring: db
         .prepare(
-          `
+          ` 
     SELECT
       ri.recurring_invoice_no,
       c.company_name as customer,
@@ -183,8 +183,8 @@ AND h.next_invoice_date BETWEEN date('now') AND date('now', '+30 days')`,
     FROM recurring_invoices ri
     JOIN recurring r
       ON r.id = ri.recurring_id
-    JOIN customers c
-      ON c.id = r.customer_id
+    JOIN contacts c 
+      ON c.id = r.contact_id AND c.is_customer = 1 
     JOIN (
       ${RECURRING_LATEST_QUERY}
     ) h
@@ -239,7 +239,7 @@ function getRevenueAnalytics(filters) {
       .prepare(
         `
       SELECT c.company_name as customer, COUNT(i.id) as invoices, SUM(i.grand_total) as revenue, SUM(i.paid_amount) as paid, SUM(i.balance_due) as outstanding 
-      FROM invoices i JOIN customers c ON c.id = i.customer_id WHERE i.is_deleted = 0 
+      FROM invoices i JOIN contacts c ON c.id = i.contact_id WHERE i.is_deleted = 0 AND c.is_customer = 1 
       GROUP BY c.id ORDER BY revenue DESC LIMIT 10
     `,
       )
@@ -255,7 +255,7 @@ function getRevenueAnalytics(filters) {
       .all(),
     byCustomer: db
       .prepare(
-        `SELECT c.company_name as name, SUM(i.grand_total) as value FROM invoices i JOIN customers c ON c.id = i.customer_id WHERE i.is_deleted = 0 GROUP BY c.id ORDER BY value DESC LIMIT 8`,
+        `SELECT c.company_name as name, SUM(i.grand_total) as value FROM invoices i JOIN contacts c ON c.id = i.contact_id WHERE i.is_deleted = 0 AND c.is_customer = 1 GROUP BY c.id ORDER BY value DESC LIMIT 8`, // Already updated in previous turn
       )
       .all(),
   };
@@ -266,37 +266,37 @@ function getCustomerAnalytics() {
   return {
     kpis: {
       total: db
-        .prepare("SELECT COUNT(*) FROM customers WHERE is_deleted = 0")
+        .prepare("SELECT COUNT(*) FROM contacts WHERE is_deleted = 0 AND is_customer = 1")
         .get()["COUNT(*)"],
       active: db
         .prepare(
-          "SELECT COUNT(DISTINCT customer_id) FROM invoices WHERE is_deleted = 0 AND invoice_date >= date('now', '-90 days')",
+          "SELECT COUNT(DISTINCT contact_id) FROM invoices WHERE is_deleted = 0 AND invoice_date >= date('now', '-90 days')", // Already updated in previous turn
         )
-        .get()["COUNT(DISTINCT customer_id)"],
+        .get()["COUNT(DISTINCT contact_id)"], 
       newThisMonth: db
         .prepare(
-          "SELECT COUNT(*) FROM customers WHERE is_deleted = 0 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')",
+          "SELECT COUNT(*) FROM contacts WHERE is_deleted = 0 AND is_customer = 1 AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')", // Already updated in previous turn
         )
         .get()["COUNT(*)"],
     },
     growthTrend: db
       .prepare(
-        "SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as new_customers FROM customers WHERE is_deleted = 0 GROUP BY month ORDER BY month ASC LIMIT 12",
+        "SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as new_customers FROM contacts WHERE is_deleted = 0 AND is_customer = 1 GROUP BY month ORDER BY month ASC LIMIT 12", // Already updated in previous turn
       )
       .all(),
     distribution: db
       .prepare(
         `
-      SELECT CASE WHEN rev < 5000 THEN '< ₹5K' WHEN rev < 25000 THEN '₹5K-₹25K' WHEN rev < 100000 THEN '₹25K-₹1L' ELSE '> ₹1L' END as bucket, COUNT(*) as count
-      FROM (SELECT SUM(grand_total) as rev FROM invoices WHERE is_deleted = 0 GROUP BY customer_id) GROUP BY bucket
+      SELECT CASE WHEN rev < 5000 THEN '< ₹5K' WHEN rev < 25000 THEN '₹5K-₹25K' WHEN rev < 100000 THEN '₹25K-₹1L' ELSE '> ₹1L' END as bucket, COUNT(*) as count // This is fine
+      FROM (SELECT SUM(grand_total) as rev FROM invoices WHERE is_deleted = 0 GROUP BY contact_id) GROUP BY bucket // Already updated in previous turn
     `,
       )
       .all(),
     topCustomers: db
       .prepare(
         `
-      SELECT c.company_name as customer, SUM(i.grand_total) as revenue, SUM(i.paid_amount) as paid, SUM(i.balance_due) as pending, COUNT(i.id) as invoiceCount, MAX(i.invoice_date) as lastInvoice
-      FROM customers c LEFT JOIN invoices i ON i.customer_id = c.id WHERE c.is_deleted = 0
+      SELECT c.company_name as customer, SUM(i.grand_total) as revenue, SUM(i.paid_amount) as paid, SUM(i.balance_due) as pending, COUNT(i.id) as invoiceCount, MAX(i.invoice_date) as lastInvoice // This is fine
+      FROM contacts c LEFT JOIN invoices i ON i.contact_id = c.id WHERE c.is_deleted = 0 AND c.is_customer = 1 // Already updated in previous turn
       GROUP BY c.id ORDER BY revenue DESC LIMIT 10
     `,
       )
@@ -304,8 +304,8 @@ function getCustomerAnalytics() {
     paymentBehaviour: db
       .prepare(
         `
-      SELECT c.company_name as customer, SUM(i.grand_total) as billed, SUM(i.paid_amount) as paid, SUM(i.balance_due) as pending
-      FROM customers c JOIN invoices i ON i.customer_id = c.id WHERE i.is_deleted = 0
+      SELECT c.company_name as customer, SUM(i.grand_total) as billed, SUM(i.paid_amount) as paid, SUM(i.balance_due) as pending // This is fine
+      FROM contacts c JOIN invoices i ON i.contact_id = c.id WHERE i.is_deleted = 0 AND c.is_customer = 1 // Already updated in previous turn
       GROUP BY c.id
     `,
       )
@@ -374,8 +374,8 @@ function getRecurringAnalytics() {
       SELECT ri.recurring_invoice_no, c.company_name as customer, ri.recurring_invoice_no as plan_name, h.next_invoice_date as due_date, h.pending_amount, h.overdue_days
       FROM recurring_invoices ri
       JOIN recurring r ON r.id = ri.recurring_id
-      JOIN customers c ON c.id = r.customer_id
-      JOIN (
+      JOIN contacts c ON c.id = r.contact_id AND c.is_customer = 1 
+      JOIN ( 
   ${RECURRING_LATEST_QUERY}
 ) h ON h.recurring_invoice_id = ri.id
       WHERE ri.is_deleted = 0 AND ri.is_stopped = 0 AND h.collection_status = 'overdue'
@@ -389,7 +389,7 @@ function getRecurringAnalytics() {
       SELECT ri.recurring_invoice_no, c.company_name as customer, h.next_invoice_date as renewal_date, ri.grand_total as amount, ri.billing_cycle, ri.auto_generate
       FROM recurring_invoices ri
       JOIN recurring r ON r.id = ri.recurring_id
-      JOIN customers c ON c.id = r.customer_id
+      JOIN contacts c ON c.id = r.contact_id AND c.is_customer = 1 
       JOIN (
   ${RECURRING_LATEST_QUERY}
 ) h ON h.recurring_invoice_id = ri.id

@@ -16,7 +16,6 @@ const today = new Date().toISOString().slice(0, 10);
 const blankItem = {
   name: "",
   description: "",
-  descriptionPoints: [],
   sac_code: "",
   qty: 1,
   billing_type: "Service",
@@ -25,7 +24,7 @@ const blankItem = {
 };
 
 const getDefaultForm = () => ({
-  vendor_id: "",
+  contact_id: "", // MUST CHANGE
   bill_no: "",
   vendor_bill_no: "",
   bill_date: today,
@@ -58,22 +57,22 @@ export default function PurchaseForm() {
     });
 
     Promise.all([
-      modules.vendors.list(),
-      modules.gst.list(),
-      modules.customers.list(),
-      modules.bankAccounts.list(), // Fetch bank accounts
-    ]).then(([vRows, sRows, gRows, custRows, bRows]) => { // bRows for bank accounts
+      modules.contacts.listVendors(), // 0: vendorContacts
+      modules.contacts.listCustomers(), // 1: customerContacts
+      modules.gst.list(), // 2: gstList
+      modules.bankAccounts.list(), // 3: bankList
+    ]).then(([vendorContacts, customerContacts, gstList, bankList]) => { // Corrected destructuring
       const combined = [
-        ...vRows.map(v => ({ id: `v_${v.id}`, name: v.company_name, real_id: v.id, type: 'vendor' })),
-        ...custRows.map(c => ({ id: `c_${c.id}`, name: `${c.company_name} (Customer)`, real_id: c.id, type: 'customer' }))
+        ...vendorContacts.map(v => ({ id: v.id, name: v.company_name, type: 'vendor', gstin: v.gstin })),
+        ...customerContacts.map(c => ({ id: c.id, name: `${c.company_name} (Customer)`, type: 'customer', gstin: c.gstin }))
       ].sort((a, b) => a.name.localeCompare(b.name)); // Sort by name
 
       setVendors(combined);
-      setGstRates(gRows);
-      setBankAccounts(bRows); // Set bank accounts
+      setGstRates(gstList);
+      setBankAccounts(bankList); // Set bank accounts
       // Set initial is_gst_enabled for new documents
       if (!isEdit) {
-        setForm(prev => ({ ...prev, bank_account_id: getDefaultBankAccountId(bRows) })); // Set default bank account
+        setForm(prev => ({ ...prev, bank_account_id: getDefaultBankAccountId(bankList) })); // Set default bank account
       }
     });
   }, [isEdit]); // Add isEdit to dependency array
@@ -87,11 +86,10 @@ export default function PurchaseForm() {
     setIsLoading(true);
     modules.purchases.get(id).then((response) => {
       console.log("[TRACE] Purchase API Response items:", response.items);
-      
-      const selectedVendorId = response.vendor_id
-        ? `v_${response.vendor_id}`
-        : vendors.find((p) => p.name === response.vendor)?.id || "";
+      // Removed selectedVendorId logic as contact_id is deprecated
 
+      const selectedContactId = response.contact_id; // Directly use contact_id
+      
       const mappedItems = response.items?.length
         ? response.items.map((item) => ({
             ...blankItem,
@@ -109,7 +107,7 @@ export default function PurchaseForm() {
       
       setForm({
         ...response,
-        vendor_id: selectedVendorId,
+        contact_id: selectedContactId, // Use contact_id
         is_gst_enabled: response.is_gst_enabled !== 0, // Use document's flag for existing docs
         items: mappedItems,
       });
@@ -118,28 +116,29 @@ export default function PurchaseForm() {
   }, [id, vendors]); // Add vendors to dependency array
 
   // Derive selected vendor name for display in "Bill No (Internal)"
-  const selectedVendorName = vendors.find((v) => v.id === form.vendor_id)?.name;
+  const selectedContactName = vendors.find((v) => v.id === form.contact_id)?.name; // Use contact_id
 
   // Console logs for debugging
   console.log("[TRACE] PurchaseForm - Form State:", form);
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!form.vendor_id) return toast.error("Please select a vendor");
+    if (!form.contact_id) return toast.error("Please select a vendor"); // Use contact_id
 
     try {
       console.log(`[TRACE] Purchase Frontend Submit - Route ID: ${id}, Payload ID: ${form.id || id}`);
-      const selectedParty = vendors.find(v => v.id === form.vendor_id); // Find the selected party from the combined list
+      const selectedParty = vendors.find(v => v.id === form.contact_id); // Find the selected party from the combined list
       const payload = { 
         ...form, 
         bill_no: form.bill_no,
-        vendor_id: selectedParty?.type === 'vendor' ? selectedParty.real_id : null,
         vendor: selectedParty?.name?.replace(' (Customer)', '') || form.vendor,
+        contact_id: selectedParty?.id, // Directly use contact_id
+        vendor: selectedParty?.name?.replace(' (Customer)', '') || form.vendor, // Keep vendor text for snapshot
         is_gst_enabled: form.is_gst_enabled ? 1 : 0, // Include is_gst_enabled in payload
       };
 
       if (isEdit) {
-        await modules.purchases.update({ ...payload, id });
+        await modules.purchases.update({ ...payload, id }); // Pass contact_id in payload
         toast.success("Purchase updated");
       } else {
         await modules.purchases.create(payload);
@@ -152,16 +151,14 @@ export default function PurchaseForm() {
   }
 
   async function handleVendorAdded(newVendor) {
-    const [vRows, custRows] = await Promise.all([modules.vendors.list(), modules.customers.list()]);
+    const [vRows, custRows] = await Promise.all([modules.contacts.listVendors(), modules.contacts.listCustomers()]);
     const combined = [
-      ...vRows.map(v => ({ id: `v_${v.id}`, name: v.company_name, real_id: v.id, type: 'vendor' })),
-      ...custRows.map(c => ({ id: `c_${c.id}`, name: `${c.company_name} (Customer)`, real_id: c.id, type: 'customer' }))
+      ...vRows.map(v => ({ id: v.id, name: v.company_name, type: 'vendor', gstin: v.gstin })),
+      ...custRows.map(c => ({ id: c.id, name: `${c.company_name} (Customer)`, type: 'customer', gstin: c.gstin }))
     ].sort((a, b) => a.name.localeCompare(b.name)); // Sort by name
 
     setVendors(combined);
-
-    // Auto-select the newly created vendor
-    setForm(prev => ({ ...prev, vendor_id: `v_${newVendor.id}` })); // Ensure prefixed ID is set
+    setForm(prev => ({ ...prev, contact_id: newVendor.id })); // Auto-select the newly created vendor, use direct ID
 
     // Close the modal
     setShowVendorModal(false);
@@ -171,7 +168,6 @@ export default function PurchaseForm() {
 
   return (
     <ContentArea>
-      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <PageHeader
           title={isEdit ? "Edit Purchase Bill" : "New Purchase Bill"}
           subtitle="Record vendor invoices and map them to expense categories"
@@ -181,13 +177,11 @@ export default function PurchaseForm() {
           <ShortcutKey keyName="ALT + I" label="Bill Date" />
           <ShortcutKey keyName="ALT + ENTER" label="Save" />
         </div>
-      </div>
-
       <form onSubmit={handleSubmit} className="grid gap-5 rounded-lg border border-slate-200 bg-white p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <div className="flex justify-between items-center mb-1">
-              <label htmlFor="vendor_id" className="block text-sm font-medium text-slate-700">Vendor</label>
+            <div className="flex justify-between items-center mb-1"> // This is fine
+              <label htmlFor="contact_id" className="block text-sm font-medium text-slate-700">Vendor</label>
               <button
                 type="button"
                 onClick={() => setShowVendorModal(true)}
@@ -197,9 +191,9 @@ export default function PurchaseForm() {
               </button>
             </div>
             <FormSelect
-              id="vendor_id"
-              value={form.vendor_id}
-              onChange={(e) => setForm({ ...form, vendor_id: e.target.value })}
+              id="contact_id"
+              value={form.contact_id}
+              onChange={(e) => setForm({ ...form, contact_id: e.target.value })} // Use contact_id
               required
             >
               <option value="">Select Vendor</option>
@@ -226,7 +220,8 @@ export default function PurchaseForm() {
         <div className="grid grid-cols-3 gap-4">
           <FormInput
             label="Bill No (Internal)"
-            value={form.bill_no + (selectedVendorName ? ` (${selectedVendorName})` : '')}
+            // Use selectedContactName
+            value={form.bill_no + (selectedContactName ? ` (${selectedContactName})` : '')}
             disabled
           />
           <FormInput
@@ -243,10 +238,11 @@ export default function PurchaseForm() {
           />
         </div>
 
-        {form.is_gst_enabled && form.vendor_id && (
+        {form.is_gst_enabled && form.contact_id && (
           <FormInput
-            label="Vendor GSTIN"
-            value={vendors.find(v => v.id === form.vendor_id)?.gstin || ''}
+            // Removed duplicate label and value for contact_id
+            label="Vendor GSTIN" // Use contact_id
+            value={vendors.find(v => v.id === form.contact_id)?.gstin || ''}
             disabled // Assuming it's read-only on the form
             className="text-slate-600"
           />

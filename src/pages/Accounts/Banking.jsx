@@ -56,8 +56,8 @@ const initialBankingEntry = {
   to_account_id: "",
   party_key: "",
   party_name: "",
-  customer_id: "",
-  vendor_id: "",
+  contact_id: "",
+  contact_id: "",
   invoice_id: "",
   recurring_invoice_id: "",
   purchase_id: "",
@@ -284,10 +284,10 @@ export default function Banking() {
         (row) =>
           (Number(row.balance_due || 0) > 0 ||
             Number(row.id) === Number(bankingEntry.invoice_id)) &&
-          (!bankingEntry.customer_id ||
-            Number(row.customer_id) === Number(bankingEntry.customer_id)),
+          (!bankingEntry.contact_id ||
+            Number(row.contact_id) === Number(bankingEntry.contact_id)),
       ),
-    [lookupData.invoices, bankingEntry.customer_id, bankingEntry.invoice_id],
+    [lookupData.invoices, bankingEntry.contact_id, bankingEntry.invoice_id],
   );
 
   const selectableRecurring = useMemo(
@@ -297,12 +297,12 @@ export default function Banking() {
           (Number(row.pending_amount || 0) > 0 ||
             Number(row.recurring_invoice_id) ===
               Number(bankingEntry.recurring_invoice_id)) &&
-          (!bankingEntry.customer_id ||
-            Number(row.customer_id) === Number(bankingEntry.customer_id)),
+          (!bankingEntry.contact_id ||
+            Number(row.contact_id) === Number(bankingEntry.contact_id)),
       ),
     [
       latestRecurringRows,
-      bankingEntry.customer_id,
+      bankingEntry.contact_id,
       bankingEntry.recurring_invoice_id,
     ],
   );
@@ -313,10 +313,10 @@ export default function Banking() {
         (row) =>
           (Number(row.balance_due || 0) > 0 ||
             Number(row.id) === Number(bankingEntry.purchase_id)) &&
-          (!bankingEntry.vendor_id ||
-            Number(row.vendor_id) === Number(bankingEntry.vendor_id)),
+          (!bankingEntry.contact_id ||
+            Number(row.contact_id) === Number(bankingEntry.contact_id)),
       ),
-    [lookupData.purchases, bankingEntry.vendor_id, bankingEntry.purchase_id],
+    [lookupData.purchases, bankingEntry.contact_id, bankingEntry.purchase_id],
   );
 
   const selectableExpenses = useMemo(
@@ -326,10 +326,10 @@ export default function Banking() {
           (Number(row.balance_due || 0) > 0 ||
             row.status !== "paid" ||
             Number(row.id) === Number(bankingEntry.expense_id)) &&
-          (!bankingEntry.vendor_id ||
-            Number(row.vendor_id) === Number(bankingEntry.vendor_id)),
+          (!bankingEntry.contact_id ||
+            Number(row.contact_id) === Number(bankingEntry.contact_id)),
       ),
-    [lookupData.expenses, bankingEntry.vendor_id, bankingEntry.expense_id],
+    [lookupData.expenses, bankingEntry.contact_id, bankingEntry.expense_id],
   );
 
   function updateBankingEntry(updates) {
@@ -362,8 +362,8 @@ export default function Banking() {
       updateBankingEntry({
         party_key: "",
         party_name: value,
-        customer_id: "",
-        vendor_id: "",
+        contact_id: "",
+        contact_id: "",
         invoice_id: "",
         recurring_invoice_id: "",
         purchase_id: "",
@@ -373,8 +373,8 @@ export default function Banking() {
     updateBankingEntry({
       party_key: option.key,
       party_name: option.name,
-      customer_id: option.type === "customer" ? option.id : "",
-      vendor_id: option.type === "vendor" ? option.id : "",
+      contact_id: option.type === "customer" ? option.id : "",
+      contact_id: option.type === "vendor" ? option.id : "",
       invoice_id: "",
       recurring_invoice_id: "",
       purchase_id: "",
@@ -671,8 +671,8 @@ export default function Banking() {
           to_account_id: bankingEntry.type === 'contra' ? Number(bankingEntry.to_account_id) : null,
           amount: Number(bankingEntry.amount),
           reference_no: bankingEntry.reference_no,
-          customer_id: bankingEntry.customer_id,
-          vendor_id: bankingEntry.vendor_id,
+          contact_id: bankingEntry.contact_id,
+          contact_id: bankingEntry.contact_id,
           notes: `Party: ${bankingEntry.party_name} | ${bankingEntry.notes}`,
           type: bankingEntry.type === "receipt" ? "credit" : "debit",
           category_id: bankingEntry.category_id,
@@ -686,11 +686,11 @@ export default function Banking() {
           to_account_id: bankingEntry.to_account_id
             ? Number(bankingEntry.to_account_id)
             : null,
-          customer_id: bankingEntry.customer_id
-            ? Number(bankingEntry.customer_id)
+          contact_id: bankingEntry.contact_id
+            ? Number(bankingEntry.contact_id)
             : null,
-          vendor_id: bankingEntry.vendor_id
-            ? Number(bankingEntry.vendor_id)
+          contact_id: bankingEntry.contact_id
+            ? Number(bankingEntry.contact_id)
             : null,
           invoice_id: bankingEntry.invoice_id
             ? Number(bankingEntry.invoice_id)
@@ -988,8 +988,8 @@ export default function Banking() {
       transaction_date: row.transaction_date,
       bank_account_id: row.bank_account_id,
       to_account_id: to_account_id,
-      customer_id: row.customer_id || "",
-      vendor_id: row.vendor_id || "",
+      contact_id: row.contact_id || "",
+      contact_id: row.contact_id || "",
       invoice_id: row.invoice_id || "",
       recurring_invoice_id: row.recurring_invoice_id || "",
       expense_id: row.expense_id || "", // Populate expense_id for editing
@@ -2944,8 +2944,8 @@ export default function Banking() {
                           );
                           updateBankingEntry({
                             invoice_id: e.target.value,
-                            customer_id:
-                              invoice?.customer_id || bankingEntry.customer_id,
+                            contact_id:
+                              invoice?.contact_id || bankingEntry.contact_id,
                             party_name:
                               invoice?.company_name || bankingEntry.party_name,
                             amount: invoice?.balance_due || 0,
@@ -2976,8 +2976,8 @@ export default function Banking() {
                           );
                           updateBankingEntry({
                             recurring_invoice_id: e.target.value,
-                            customer_id:
-                              plan?.customer_id || bankingEntry.customer_id,
+                            contact_id:
+                              plan?.contact_id || bankingEntry.contact_id,
                             party_name:
                               plan?.company_name || bankingEntry.party_name,
                             amount: plan?.pending_amount || 0,
@@ -3009,8 +3009,8 @@ export default function Banking() {
                           );
                           updateBankingEntry({
                             purchase_id: e.target.value,
-                            vendor_id:
-                              purchase?.vendor_id || bankingEntry.vendor_id,
+                            contact_id:
+                              purchase?.contact_id || bankingEntry.contact_id,
                             party_name:
                               purchase?.vendor_name ||
                               purchase?.vendor ||
@@ -3041,8 +3041,8 @@ export default function Banking() {
                           );
                           updateBankingEntry({
                             expense_id: e.target.value,
-                            vendor_id:
-                              expense?.vendor_id || bankingEntry.vendor_id,
+                            contact_id:
+                              expense?.contact_id || bankingEntry.contact_id,
                             party_name:
                               expense?.vendor_name ||
                               expense?.vendor ||

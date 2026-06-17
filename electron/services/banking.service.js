@@ -46,8 +46,8 @@ function recordBankingEntry(payload = {}) {
     if (referenceType === "invoice") {
       if (!payload.invoice_id) throw new Error("Invoice is required");
       return payments.recordPayment({
-        invoice_id: Number(payload.invoice_id),
-        customer_id: payload.customer_id ? Number(payload.customer_id) : null,
+        invoice_id: Number(payload.invoice_id), // This is fine
+        contact_id: payload.contact_id ? Number(payload.contact_id) : null, // MUST CHANGE
         payment_date: payload.transaction_date,
         amount,
         mode: paymentMode(payload),
@@ -61,8 +61,8 @@ function recordBankingEntry(payload = {}) {
     if (referenceType === "recurring") {
       if (!payload.recurring_invoice_id) throw new Error("Recurring plan is required");
       return payments.recordPayment({
-        recurring_invoice_id: Number(payload.recurring_invoice_id),
-        customer_id: payload.customer_id ? Number(payload.customer_id) : null,
+        recurring_invoice_id: Number(payload.recurring_invoice_id), // This is fine
+        contact_id: payload.contact_id ? Number(payload.contact_id) : null, // MUST CHANGE
         payment_date: payload.transaction_date,
         amount,
         mode: paymentMode(payload),
@@ -76,7 +76,7 @@ function recordBankingEntry(payload = {}) {
     return payments.recordPayment({
       bank_account_id: Number(payload.bank_account_id),
       payment_date: payload.transaction_date,
-      customer_id: payload.customer_id || 1, // Fallback to General Customer if needed
+      contact_id: payload.contact_id || 1, // Fallback to General Customer if needed // MUST CHANGE
       amount,
       mode: paymentMode(payload),
       reference_no: referenceNo(payload),
@@ -89,8 +89,8 @@ function recordBankingEntry(payload = {}) {
     if (referenceType === "purchase") {
       if (!payload.purchase_id) throw new Error("Purchase is required");
       return purchases.recordPurchasePayment({
-        purchase_id: Number(payload.purchase_id),
-        vendor_id: payload.vendor_id ? Number(payload.vendor_id) : null,
+        purchase_id: Number(payload.purchase_id), // This is fine
+        contact_id: payload.contact_id ? Number(payload.contact_id) : null, // MUST CHANGE
         payment_date: payload.transaction_date,
         amount,
         mode: paymentMode(payload),
@@ -105,8 +105,8 @@ function recordBankingEntry(payload = {}) {
       // Now records payment against an existing expense, not creates a new one
       if (!payload.expense_id) throw new Error("Expense is required");
       return expenses.recordExpensePayment({
-        expense_id: Number(payload.expense_id),
-        vendor_id: payload.vendor_id ? Number(payload.vendor_id) : null,
+        expense_id: Number(payload.expense_id), // This is fine
+        contact_id: payload.contact_id ? Number(payload.contact_id) : null, // MUST CHANGE
         category_id: payload.category_id ? Number(payload.category_id) : null,
         payment_date: payload.transaction_date,
         amount,
@@ -120,7 +120,7 @@ function recordBankingEntry(payload = {}) {
     return purchases.recordPurchasePayment({
       bank_account_id: Number(payload.bank_account_id),
       payment_date: payload.transaction_date,
-      vendor_id: payload.vendor_id || 1, // Fallback to General Vendor
+      contact_id: payload.contact_id || 1, // Fallback to General Vendor // MUST CHANGE
       amount,
       mode: paymentMode(payload),
       reference_no: referenceNo(payload),

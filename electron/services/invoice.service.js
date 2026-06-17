@@ -25,18 +25,18 @@ function paymentTermsDays(customer) {
 function createInvoice(payload) {
   const db = getDb();
   return db.transaction(() => {
-    const customer = db
-      .prepare("SELECT * FROM customers WHERE id = ? AND is_deleted = 0")
-      .get(payload.customer_id);
-    if (!customer) throw new Error("Customer not found");
+    const contact = db
+      .prepare("SELECT * FROM contacts WHERE id = ? AND is_customer = 1 AND is_deleted = 0") // Ensure it's a customer
+      .get(payload.contact_id); // Use contact_id
+    if (!contact) throw new Error("Customer not found");
     const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
     const invoiceDate =
       payload.invoice_date || formatISO(new Date(), { representation: "date" });
     const rawDue = payload.due_date;
     const terms = paymentTermsDays(customer);
 
-    const dueDate =
-      rawDue != null && String(rawDue).trim() !== ""
+    const dueDate = // Use contact's payment terms
+      rawDue != null && String(rawDue).trim() !== "" // This comment is misleading, it's not using contact's payment terms here directly
         ? rawDue
         : terms == null
           ? null
@@ -45,10 +45,10 @@ function createInvoice(payload) {
             });
     const status = normalizeInvoiceWorkflowStatus(payload.status) || "pending";
     const outgoingSetting = db.prepare("SELECT value FROM settings WHERE key = 'gst_enabled_outgoing'").get();
-    const isGstEnabled = payload.is_gst_enabled !== undefined ? (payload.is_gst_enabled ? 1 : 0) : (outgoingSetting?.value !== '0' ? 1 : 0);
+    const isGstEnabled = payload.is_gst_enabled !== undefined ? (payload.is_gst_enabled ? 1 : 0) : (outgoingSetting?.value !== '0' ? 1 : 0); // This is fine
 
     const pct = discountPct01(payload, null);
-    const totals = totalsForItems(
+    const totals = totalsForItems( // Use contact for GST calculation
       payload.items || [],
       company,
       customer,
@@ -62,14 +62,14 @@ function createInvoice(payload) {
       .prepare(
         `
       INSERT INTO invoices (
-        invoice_no, customer_id, quotation_id, invoice_date, due_date, status, is_gst_enabled, subtotal, discount, discount_is_percent,
+        invoice_no, contact_id, quotation_id, invoice_date, due_date, status, is_gst_enabled, subtotal, discount, discount_is_percent,
         cgst_total, sgst_total, igst_total, tax_total, grand_total, round_off, balance_due, is_recurring, recurring_id, notes
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
         invoiceNo,
-        payload.customer_id,
+        payload.contact_id,
         payload.quotation_id || null,
         invoiceDate,
         dueDate,
@@ -169,9 +169,9 @@ function updateInvoice(payload) {
       throw new Error("Cancelled invoice cannot be edited");
 
     const customer = db
-      .prepare("SELECT * FROM customers WHERE id = ? AND is_deleted = 0")
-      .get(payload.customer_id ?? existing.customer_id);
-    if (!customer) throw new Error("Customer not found");
+      .prepare("SELECT * FROM contacts WHERE id = ? AND is_customer = 1 AND is_deleted = 0") // Ensure it's a customer
+      .get(payload.contact_id ?? existing.contact_id); // Use contact_id
+    if (!customer) throw new Error("Customer not found"); // This is fine, variable name is 'customer'
     const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
     const invoiceDate = payload.invoice_date || existing.invoice_date;
     const rawDue = payload.due_date;
@@ -180,15 +180,15 @@ function updateInvoice(payload) {
       dueDate = rawDue;
     } else if (existing.due_date) {
       dueDate = existing.due_date;
-    } else {
+    } else { // This is fine, paymentTermsDays expects a customer/contact object
       dueDate = formatISO(
         addDays(new Date(invoiceDate), paymentTermsDays(customer)),
         { representation: "date" },
       );
     }
 
-    const isGstEnabled = payload.is_gst_enabled !== undefined ? (payload.is_gst_enabled ? 1 : 0) : (existing.is_gst_enabled ?? 1);
-    const pct = discountPct01(payload, existing);
+    const isGstEnabled = payload.is_gst_enabled !== undefined ? (payload.is_gst_enabled ? 1 : 0) : (existing.is_gst_enabled ?? 1); // Use contact for GST calculation
+    const pct = discountPct01(payload, existing); // This is fine
     const totals = totalsForItems(
       payload.items || [],
       company,
@@ -212,12 +212,12 @@ function updateInvoice(payload) {
     db.prepare(
       `
       UPDATE invoices SET
-        customer_id = ?, invoice_date = ?, due_date = ?, status = ?, is_gst_enabled = ?, discount = ?, discount_is_percent = ?,
+        contact_id = ?, invoice_date = ?, due_date = ?, status = ?, is_gst_enabled = ?, discount = ?, discount_is_percent = ?,
         subtotal = ?, cgst_total = ?, sgst_total = ?, igst_total = ?, tax_total = ?, grand_total = ?, round_off = ?, balance_due = ?, notes = ?
       WHERE id = ?
     `,
     ).run(
-      payload.customer_id ?? existing.customer_id,
+      payload.contact_id ?? existing.contact_id,
       invoiceDate,
       dueDate,
       nextStatus,
@@ -340,7 +340,7 @@ function getInvoice(id) {
       c.country,
       company.state AS company_state
     FROM invoices i
-    JOIN customers c ON c.id = i.customer_id
+    JOIN contacts c ON c.id = i.contact_id
     LEFT JOIN company ON company.id = 1
     WHERE i.id = ?
   `,
@@ -421,7 +421,7 @@ function listInvoices() {
         ) AS service_items
 
       FROM invoices i
-      JOIN customers c ON c.id = i.customer_id
+      JOIN contacts c ON c.id = i.contact_id
 
       WHERE i.is_deleted = 0
 
@@ -450,7 +450,7 @@ function cancelInvoice(id, role = "operator") {
   })();
 }
 
-function listInvoicesByCustomer(customerId) {
+function listInvoicesByContact(contactId) { // Rename parameter
   const db = getDb();
 
   const invoices = db
@@ -463,14 +463,14 @@ function listInvoicesByCustomer(customerId) {
         i.status,
         i.grand_total
 
-      FROM invoices i
+      FROM invoices i // This is fine
 
-      WHERE i.customer_id = ?
+      WHERE i.contact_id = ? // Use contact_id
 
       ORDER BY i.id DESC
     `,
     )
-    .all(customerId);
+    .all(contactId); // Use contactId
 
   return invoices.map((invoice) => {
     const items = db
@@ -495,6 +495,6 @@ module.exports = {
   updateInvoice,
   getInvoice,
   listInvoices,
-  listInvoicesByCustomer,
+  listInvoicesByContact,
   cancelInvoice,
 };

@@ -29,7 +29,7 @@ export default function QuotationList() {
       disableInlineEdit
       fields={[
         {
-          name: "customer_id",
+          name: "contact_id",
           label: "Customer ID",
           type: "number",
           required: true,
