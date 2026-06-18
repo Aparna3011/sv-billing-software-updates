@@ -7,7 +7,6 @@ module.exports = ipcMain => {
   ipcMain.handle('invoices:create', ok(payload => invoices.createInvoice(payload)));
   ipcMain.handle('invoices:update', ok(payload => invoices.updateInvoice(payload)));
   ipcMain.handle('invoices:cancel', ok(({ id, role }) => invoices.cancelInvoice(id, role)));
-  ipcMain.handle('invoices:listByCustomer', ok(({ customerId }) => invoices.listInvoicesByCustomer(customerId)));
   ipcMain.handle('invoices:listByCustomer', ok(({ customerId }) => invoices.listInvoicesByContact(customerId)));
   ipcMain.handle('invoices:delete', ok(({ id }) => {
     const { getDb } = require('../db/database');
@@ -20,7 +19,7 @@ module.exports = ipcMain => {
       db.prepare(`
         UPDATE quotations
         SET converted_invoice_id = NULL,
-            status = CASE WHEN status = 'converted' THEN 'approved' ELSE status END
+            status = CASE WHEN status = 'converted' THEN 'accepted' ELSE status END
         WHERE converted_invoice_id = ?
       `).run(id);
 

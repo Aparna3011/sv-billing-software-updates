@@ -79,10 +79,6 @@ module.exports = (ipcMain) => {
     }),
   );
   ipcMain.handle(
-    "quotations:convert",
-    ok(({ id }) => quotations.convertToInvoice(id)),
-  );
-  ipcMain.handle(
     "quotations:delete",
     ok(({ id }) =>
       getDb()

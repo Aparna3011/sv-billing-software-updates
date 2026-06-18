@@ -1,6 +1,7 @@
 const { addDays, formatISO } = require("date-fns");
 const { getDb } = require("../db/database");
 const numbering = require("./numbering.service");
+const quotations = require("./quotation.service"); // Import quotation service
 const { totalsForItems, discountPct01, ensureService } = require("./gst.service");
 const activity = require("./activitylog.service");
 
@@ -33,7 +34,7 @@ function createInvoice(payload) {
     const invoiceDate =
       payload.invoice_date || formatISO(new Date(), { representation: "date" });
     const rawDue = payload.due_date;
-    const terms = paymentTermsDays(customer);
+    const terms = paymentTermsDays(contact);
 
     const dueDate = // Use contact's payment terms
       rawDue != null && String(rawDue).trim() !== "" // This comment is misleading, it's not using contact's payment terms here directly
@@ -51,7 +52,7 @@ function createInvoice(payload) {
     const totals = totalsForItems( // Use contact for GST calculation
       payload.items || [],
       company,
-      customer,
+      contact,
       payload.discount || 0,
       pct === 1,
       isGstEnabled === 1
@@ -152,6 +153,12 @@ function createInvoice(payload) {
       entityId: info.lastInsertRowid,
       message: invoiceNo,
     });
+
+    // If created from a quotation, update the quotation status
+    if (payload.quotation_id) {
+      db.prepare("UPDATE quotations SET status = 'converted', converted_invoice_id = ? WHERE id = ?").run(info.lastInsertRowid, payload.quotation_id);
+      activity.log('quotation:converted', { entityType: 'quotation', entityId: payload.quotation_id, message: `Converted to invoice ${invoiceNo}` });
+    }
     return getInvoice(info.lastInsertRowid);
   })();
 }
@@ -164,7 +171,7 @@ function updateInvoice(payload) {
       .prepare("SELECT * FROM invoices WHERE id = ? AND is_deleted = 0")
       .get(payload.id);
     if (!existing) throw new Error("Invoice not found");
-    // if (Number(existing.paid_amount) > 0) throw new Error('Invoice with payments cannot be edited');
+    if (Number(existing.paid_amount) > 0) throw new Error('Invoice with payments cannot be edited');
     if (existing.status === "cancelled")
       throw new Error("Cancelled invoice cannot be edited");
 

@@ -68,6 +68,13 @@ function updateQuotation(payload) {
     const company = db.prepare('SELECT * FROM company WHERE id = 1').get();
     const isGstEnabled = payload.is_gst_enabled !== undefined ? (payload.is_gst_enabled ? 1 : 0) : (quotation.is_gst_enabled ?? 1);
 
+    let nextStatus = payload.status || quotation.status;
+    // Rule: If an accepted quotation is edited, reset it to draft
+    if (quotation.status === 'accepted' && !payload.status) {
+      nextStatus = 'draft';
+      activity.log('quotation:status_reset', { entityType: 'quotation', entityId: payload.id, message: `Quotation ${quotation.quotation_no} reset to draft due to edit.` });
+    }
+
     const pct = discountPct01(payload, quotation);
     const totals = totalsForItems(payload.items || quotation.items, company, customer, payload.discount || 0, pct === 1, isGstEnabled === 1);
     db.prepare(`
@@ -77,7 +84,7 @@ function updateQuotation(payload) {
       payload.contact_id || quotation.contact_id,
       payload.quotation_date || quotation.quotation_date,
       payload.valid_until || null,
-      payload.status || quotation.status,
+      nextStatus,
       isGstEnabled,
       payload.discount || 0,
       pct,
@@ -192,8 +199,6 @@ if (!quotation) return null;
 
   quotation.document_no = quotation.quotation_no;
   quotation.document_date = quotation.quotation_date;
-  quotation.invoice_no = quotation.quotation_no;
-  quotation.invoice_date = quotation.quotation_date;
   quotation.due_date = quotation.valid_until;
 
   quotation.items = db.prepare(`
@@ -216,26 +221,4 @@ if (!quotation) return null;
   return quotation;
 }
 
-function convertToInvoice(id) {
-  const db = getDb();
-  return db.transaction(() => {
-    const quotation = getQuotation(id);
-    if (!quotation) throw new Error('Quotation not found');
-    if (quotation.status !== 'approved') throw new Error('Only approved quotations can be converted');
-    if (quotation.converted_invoice_id) throw new Error('Quotation is already converted');
-    const invoice = invoices.createInvoice({
-      contact_id: quotation.contact_id,
-      is_gst_enabled: quotation.is_gst_enabled,
-      quotation_id: quotation.id,
-      discount: quotation.discount,
-      discount_is_percent: quotation.discount_is_percent,
-      notes: quotation.notes,
-      items: quotation.items
-    });
-    db.prepare("UPDATE quotations SET status = 'converted', converted_invoice_id = ? WHERE id = ?").run(invoice.id, id);
-    activity.log('quotation:converted', { entityType: 'quotation', entityId: id, message: quotation.quotation_no });
-    return invoice;
-  })();
-}
-
-module.exports = { createQuotation, updateQuotation, getQuotation, convertToInvoice };
+module.exports = { createQuotation, updateQuotation, getQuotation };
