@@ -174,50 +174,20 @@ export default function InvoicePDF({
   qrSrc = null,
   title = "INVOICE",
   documentMode = "print",
+  showPaymentDetails = true,
+  showTotals = true,
 }) {
   const documentLabels = {
     INVOICE: {
       no: "Invoice No :",
       date: "Invoice Date :",
     },
-
     QUOTATION: {
       no: "Quotation No :",
       date: "Quotation Date :",
     },
-
-    "RECURRING BILLING": {
-      no: "Recurring No :",
-      date: "Recurring Date :",
-    },
-
-    "RECURRING INVOICE": {
-      no: "Invoice No :",
-      date: "Invoice Date :",
-    },
-
-    "PAYMENT RECEIPT": {
-      no: "Payment No :",
-      date: "Payment Date :",
-    },
-
-    "PURCHASE BILL": {
-      no: "Purchase No :",
-      date: "Purchase Date :",
-    },
-
-    "PURCHASE PAYMENT RECEIPT": {
-      no: "Payment No :",
-      date: "Payment Date :",
-    },
-
-    "EXPENSE VOUCHER": {
-      no: "Voucher No :",
-      date: "Voucher Date :",
-    },
   };
-
-  const labels = documentLabels[title] || documentLabels["INVOICE"];
+  const labels = documentLabels[title] || documentLabels.INVOICE;
   const isQuotation = title === "QUOTATION";
   const footerReserve = 25;
 
@@ -291,7 +261,8 @@ export default function InvoicePDF({
                       </Text>
                     </View>
 
-                    {Number(invoice.paid_amount || 0) > 0 &&
+                    {showPaymentDetails &&
+                      Number(invoice.paid_amount || 0) > 0 &&
                       invoice.payment_no &&
                       invoice.payment_date && (
                         <>
@@ -337,9 +308,9 @@ export default function InvoicePDF({
         <View style={pdfStyles.contentBody}>
           <PDFLineItems chunks={page.chunks} invoice={invoice} />
 
-          {/* {page.isLastPage && (
-            <PDFTotals document={invoice} isInvoice={!isQuotation} />
-          )} */}
+          {showTotals && page.isLastPage && (
+            <PDFTotals document={invoice} isInvoice />
+          )}
         </View>
 
         <View style={pdfStyles.footerBlock} wrap={false} fixed>

@@ -17,6 +17,14 @@ const { pdfStyles } = require("../../src/components/pdf/pdfStyles.js");
 
 const QuotationPDF =
   require("../../src/components/pdf/QuotationPDF.jsx").default;
+const RecurringBillingPDF =
+  require("../../src/components/pdf/RecurringBillingPDF.jsx").default;
+const PurchaseBillPDF =
+  require("../../src/components/pdf/PurchaseBillPDF.jsx").default;
+const ExpenseVoucherPDF =
+  require("../../src/components/pdf/ExpenseVoucherPDF.jsx").default;
+const PaymentReceiptPDF =
+  require("../../src/components/pdf/PaymentReceiptPDF.jsx").default;
 const { round } = require("../services/gst.service"); // Import round function for consistent rounding
 
 function roundAmount(value) {
@@ -140,10 +148,6 @@ module.exports = (ipcMain, _getWindow, shell) => {
       const document = React.createElement(QuotationPDF, {
         quotation: doc,
         company,
-        qrSrc: company.upi_id
-          ? await QRCode.toDataURL(`upi://pay?pa=${company.upi_id}`)
-          : null,
-        title: "QUOTATION",
         documentMode,
       });
 
@@ -175,8 +179,8 @@ module.exports = (ipcMain, _getWindow, shell) => {
       const db = getDb();
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
       const doc = buildRecurringDocument(db, { historyId });
-      const document = React.createElement(InvoicePDF, {
-        invoice: doc,
+      const document = React.createElement(RecurringBillingPDF, {
+        recurring: doc,
         company,
         qrSrc: await buildUpiQr(company, doc),
         title: "RECURRING INVOICE",
@@ -273,13 +277,12 @@ module.exports = (ipcMain, _getWindow, shell) => {
       if (payment.notes) invoice.notes = payment.notes;
 
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
-      const qrSrc = await buildUpiQr(company, invoice);
 
-      const document = React.createElement(InvoicePDF, {
-        invoice,
+      const document = React.createElement(PaymentReceiptPDF, {
+        payment: invoice,
         company,
-        qrSrc,
         title: "PAYMENT RECEIPT",
+        partyTitle: "Received From",
         documentMode,
       });
 
@@ -309,11 +312,9 @@ module.exports = (ipcMain, _getWindow, shell) => {
       const db = getDb();
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
       const expense = buildExpenseDocument(db, id);
-      const document = React.createElement(InvoicePDF, {
-        invoice: expense,
+      const document = React.createElement(ExpenseVoucherPDF, {
+        expense,
         company,
-        qrSrc: null,
-        title: "EXPENSE VOUCHER",
         documentMode,
       });
       const exportsDir = getExportsDir();
@@ -338,11 +339,9 @@ module.exports = (ipcMain, _getWindow, shell) => {
       const db = getDb();
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
       const purchase = buildPurchaseDocument(db, id);
-      const document = React.createElement(InvoicePDF, {
-        invoice: purchase,
+      const document = React.createElement(PurchaseBillPDF, {
+        purchase,
         company,
-        qrSrc: null,
-        title: "PURCHASE BILL",
         documentMode,
       });
       const exportsDir = getExportsDir();
@@ -383,11 +382,11 @@ module.exports = (ipcMain, _getWindow, shell) => {
       doc.payment_mode = payment.mode;
       doc.notes = payment.notes || doc.notes;
 
-      const document = React.createElement(InvoicePDF, {
-        invoice: doc,
+      const document = React.createElement(PaymentReceiptPDF, {
+        payment: doc,
         company,
-        qrSrc: null,
         title: isExpense ? "EXPENSE PAYMENT RECEIPT" : "PURCHASE PAYMENT RECEIPT",
+        partyTitle: "Paid To",
         documentMode,
       });
       const exportsDir = getExportsDir();
@@ -471,8 +470,8 @@ module.exports = (ipcMain, _getWindow, shell) => {
         templateId,
       });
 
-      const document = React.createElement(InvoicePDF, {
-        invoice,
+      const document = React.createElement(RecurringBillingPDF, {
+        recurring: invoice,
         company,
         qrSrc: await buildUpiQr(company, invoice),
         title: "RECURRING BILLING",
@@ -803,8 +802,8 @@ SELECT r.*,
         }
       }
 
-      const document = React.createElement(InvoicePDF, {
-        invoice: invoiceProxy,
+      const document = React.createElement(RecurringBillingPDF, {
+        recurring: invoiceProxy,
         company,
         qrSrc,
         title: "RECURRING BILLING",
