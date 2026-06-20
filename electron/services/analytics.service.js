@@ -287,16 +287,16 @@ function getCustomerAnalytics() {
     distribution: db
       .prepare(
         `
-      SELECT CASE WHEN rev < 5000 THEN '< ₹5K' WHEN rev < 25000 THEN '₹5K-₹25K' WHEN rev < 100000 THEN '₹25K-₹1L' ELSE '> ₹1L' END as bucket, COUNT(*) as count // This is fine
-      FROM (SELECT SUM(grand_total) as rev FROM invoices WHERE is_deleted = 0 GROUP BY contact_id) GROUP BY bucket // Already updated in previous turn
+      SELECT CASE WHEN rev < 5000 THEN '< ₹5K' WHEN rev < 25000 THEN '₹5K-₹25K' WHEN rev < 100000 THEN '₹25K-₹1L' ELSE '> ₹1L' END as bucket, COUNT(*) as count 
+      FROM (SELECT SUM(grand_total) as rev FROM invoices WHERE is_deleted = 0 GROUP BY contact_id) GROUP BY bucket 
     `,
       )
       .all(),
     topCustomers: db
       .prepare(
         `
-      SELECT c.company_name as customer, SUM(i.grand_total) as revenue, SUM(i.paid_amount) as paid, SUM(i.balance_due) as pending, COUNT(i.id) as invoiceCount, MAX(i.invoice_date) as lastInvoice // This is fine
-      FROM contacts c LEFT JOIN invoices i ON i.contact_id = c.id WHERE c.is_deleted = 0 AND c.is_customer = 1 // Already updated in previous turn
+      SELECT c.company_name as customer, SUM(i.grand_total) as revenue, SUM(i.paid_amount) as paid, SUM(i.balance_due) as pending, COUNT(i.id) as invoiceCount, MAX(i.invoice_date) as lastInvoice 
+      FROM contacts c LEFT JOIN invoices i ON i.contact_id = c.id WHERE c.is_deleted = 0 AND c.is_customer = 1 
       GROUP BY c.id ORDER BY revenue DESC LIMIT 10
     `,
       )
@@ -304,8 +304,8 @@ function getCustomerAnalytics() {
     paymentBehaviour: db
       .prepare(
         `
-      SELECT c.company_name as customer, SUM(i.grand_total) as billed, SUM(i.paid_amount) as paid, SUM(i.balance_due) as pending // This is fine
-      FROM contacts c JOIN invoices i ON i.contact_id = c.id WHERE i.is_deleted = 0 AND c.is_customer = 1 // Already updated in previous turn
+      SELECT c.company_name as customer, SUM(i.grand_total) as billed, SUM(i.paid_amount) as paid, SUM(i.balance_due) as pending 
+      FROM contacts c JOIN invoices i ON i.contact_id = c.id WHERE i.is_deleted = 0 AND c.is_customer = 1 
       GROUP BY c.id
     `,
       )

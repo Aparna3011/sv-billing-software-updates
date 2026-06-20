@@ -151,8 +151,8 @@ function listExpenses() {
       FROM expenses e
       LEFT JOIN contacts v ON v.id = e.contact_id
       LEFT JOIN expense_categories ec ON ec.id = e.category_id
-      LEFT JOIN bank_accounts ba ON ba.id = e.bank_account_id // This is fine
-      LEFT JOIN bank_transactions bt ON bt.id = e.bank_transaction_id // This is fine
+      LEFT JOIN bank_accounts ba ON ba.id = e.bank_account_id 
+      LEFT JOIN bank_transactions bt ON bt.id = e.bank_transaction_id 
       WHERE e.is_deleted = 0
       ORDER BY e.expense_date DESC, e.id DESC
     `,
@@ -190,8 +190,8 @@ function getExpense(id) {
       ba.account_name AS bank_account_name,
       bt.id AS linked_bank_transaction_id,
       bt.balance_after
-    FROM expenses e // This is fine
-    LEFT JOIN contacts v ON v.id = e.contact_id AND v.is_vendor = 1 // MUST CHANGE
+    FROM expenses e 
+    LEFT JOIN contacts v ON v.id = e.contact_id AND v.is_vendor = 1 
     LEFT JOIN expense_categories ec ON ec.id = e.category_id
     LEFT JOIN bank_accounts ba ON ba.id = e.bank_account_id
     LEFT JOIN bank_transactions bt ON bt.id = e.bank_transaction_id
@@ -302,7 +302,7 @@ function createExpense(payload) {
       .prepare(
         `
         INSERT INTO expenses (
-        expense_no, expense_date, vendor, contact_id, category, category_id, is_gst_enabled, // MUST CHANGE
+        expense_no, expense_date, vendor, contact_id, category, category_id, is_gst_enabled, 
           amount, subtotal, gst_rate, gst_amount, tax_total, cgst_total, 
           sgst_total, igst_total, total_amount, payment_mode,
           reference_no, notes, attachment_path, bank_account_id, status,
@@ -310,7 +310,7 @@ function createExpense(payload) {
         )
         VALUES (
         @expense_no, @expense_date, @vendor, @contact_id, @category, @category_id, @is_gst_enabled,
-          @amount, @subtotal, @gst_rate, @gst_amount, @tax_total, @cgst_total, // This is fine
+          @amount, @subtotal, @gst_rate, @gst_amount, @tax_total, @cgst_total, 
           @sgst_total, @igst_total, @total_amount, @payment_mode,
           @reference_no, @notes, @attachment_path, @bank_account_id, @status,
           @paid_amount, @balance_due
@@ -381,7 +381,7 @@ function updateExpense(payload) {
       UPDATE expenses
       SET expense_no = @expense_no,
           expense_date = @expense_date,
-          vendor = @vendor, // This is fine
+          vendor = @vendor, 
           contact_id = @contact_id,
           category = @category,
           category_id = @category_id,

@@ -470,9 +470,9 @@ function listInvoicesByContact(contactId) { // Rename parameter
         i.status,
         i.grand_total
 
-      FROM invoices i // This is fine
+      FROM invoices i 
 
-      WHERE i.contact_id = ? // Use contact_id
+      WHERE i.contact_id = ? 
 
       ORDER BY i.id DESC
     `,

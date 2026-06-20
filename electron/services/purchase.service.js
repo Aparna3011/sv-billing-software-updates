@@ -290,14 +290,14 @@ function createPurchase(payload) {
         `
         INSERT INTO purchases (
           bill_date, due_date, vendor, contact_id, bill_no, vendor_bill_no, is_gst_enabled,
-          service_name, amount, gst_rate, gst_amount, subtotal, cgst_total, // This is fine
+          service_name, amount, gst_rate, gst_amount, subtotal, cgst_total, 
           sgst_total, igst_total, tax_total, grand_total, paid_amount,
           balance_due, status, notes
         )
         VALUES (
           @bill_date, @due_date, @vendor, @contact_id, @bill_no, @vendor_bill_no, @is_gst_enabled,
           @service_name, @amount, @gst_rate, @gst_amount, @subtotal, @cgst_total,
-          @sgst_total, @igst_total, @tax_total, @grand_total, @paid_amount, // This is fine
+          @sgst_total, @igst_total, @tax_total, @grand_total, @paid_amount, 
           @balance_due, @status, @notes
         )
       `,
@@ -438,7 +438,7 @@ function recordPurchasePayment(payload) {
     const info = db
       .prepare(
         `
-        INSERT INTO outgoing_payments ( // This is fine
+        INSERT INTO outgoing_payments ( 
           purchase_id, contact_id, payment_no, payment_date, amount,
           mode, reference_no, notes, bank_account_id
         )

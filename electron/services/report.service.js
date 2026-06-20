@@ -36,7 +36,7 @@ function customerLedger(filters = {}) {
           `
           SELECT COALESCE(SUM(grand_total), 0) total
           FROM invoices
-          WHERE contact_id = ? AND is_deleted = 0 AND status != 'cancelled' AND invoice_date < ? // Already updated in previous turn
+          WHERE contact_id = ? AND is_deleted = 0 AND status != 'cancelled' AND invoice_date < ? 
         `,
         )
         .get(contactId, filters.from_date).total // Already updated in previous turn
@@ -47,7 +47,7 @@ function customerLedger(filters = {}) {
           `
           SELECT COALESCE(SUM(amount), 0) total
           FROM incoming_payments
-          WHERE contact_id = ? // Already updated in previous turn
+          WHERE contact_id = ? 
             AND COALESCE(is_deleted, 0) = 0
             AND payment_date < ?
         `,
@@ -66,7 +66,7 @@ function customerLedger(filters = {}) {
       SELECT id AS sort_id, invoice_date AS date, invoice_no AS reference_no,
              'Invoice' AS type, grand_total AS debit, 0 AS credit
       FROM invoices
-      WHERE contact_id = ? AND is_deleted = 0 AND status != 'cancelled' ${invoiceDateFilter} // Already updated in previous turn
+      WHERE contact_id = ? AND is_deleted = 0 AND status != 'cancelled' ${invoiceDateFilter} 
     `,
     )
     .all(...invoiceParams);
@@ -77,7 +77,7 @@ function customerLedger(filters = {}) {
       SELECT id AS sort_id, payment_date AS date, payment_no AS reference_no,
              'Payment' AS type, 0 AS debit, amount AS credit
       FROM incoming_payments
-      WHERE contact_id = ? // Already updated in previous turn
+      WHERE contact_id = ? 
         AND COALESCE(is_deleted, 0) = 0
         ${paymentDateFilter}
     `,
@@ -114,7 +114,7 @@ function vendorLedger(filters = {}) {
           `
           SELECT COALESCE(SUM(grand_total), 0) total
           FROM purchases
-          WHERE contact_id = ? AND is_deleted = 0 AND bill_date < ? // Already updated in previous turn
+          WHERE contact_id = ? AND is_deleted = 0 AND bill_date < ? 
         `,
         )
         .get(contactId, filters.from_date).total // Already updated in previous turn
@@ -125,7 +125,7 @@ function vendorLedger(filters = {}) {
           `
           SELECT COALESCE(SUM(amount), 0) total
           FROM outgoing_payments
-          WHERE contact_id = ? // Already updated in previous turn
+          WHERE contact_id = ? 
             AND COALESCE(is_deleted, 0) = 0
             AND payment_date < ?
         `,
@@ -144,7 +144,7 @@ function vendorLedger(filters = {}) {
       SELECT id AS sort_id, bill_date AS date, bill_no AS reference_no,
              'Purchase Bill' AS type, 0 AS debit, grand_total AS credit
       FROM purchases
-      WHERE contact_id = ? AND is_deleted = 0 ${purchaseDateFilter} // Already updated in previous turn
+      WHERE contact_id = ? AND is_deleted = 0 ${purchaseDateFilter} 
     `,
     )
     .all(...purchaseParams);
@@ -157,7 +157,7 @@ function vendorLedger(filters = {}) {
       FROM outgoing_payments op
       LEFT JOIN expenses e ON e.id = op.expense_id
       LEFT JOIN purchases p ON p.id = op.purchase_id
-      WHERE COALESCE(op.contact_id, e.contact_id, p.contact_id) = ? // Already updated in previous turn
+      WHERE COALESCE(op.contact_id, e.contact_id, p.contact_id) = ? 
         AND COALESCE(op.is_deleted, 0) = 0
         ${paymentDateFilter}
     `,
@@ -183,9 +183,9 @@ function gstReport() {
       `
       SELECT invoice_no, invoice_date, company_name, taxable_value, cgst_total, sgst_total, igst_total, tax_total, grand_total
       FROM (
-        SELECT i.*, c.company_name, (i.subtotal - i.discount) taxable_value // This is fine
-        FROM invoices i JOIN contacts c ON c.id = i.contact_id // Already updated in previous turn
-        WHERE i.is_deleted = 0 AND i.status != 'cancelled' AND c.is_customer = 1 // Already updated in previous turn
+        SELECT i.*, c.company_name, (i.subtotal - i.discount) taxable_value 
+        FROM invoices i JOIN contacts c ON c.id = i.contact_id 
+        WHERE i.is_deleted = 0 AND i.status != 'cancelled' AND c.is_customer = 1 
       ) ORDER BY invoice_date DESC
     `,
     )
@@ -198,7 +198,7 @@ function outstandingReport() {
       `
       SELECT i.invoice_no, i.invoice_date, i.due_date, c.company_name, i.grand_total, i.paid_amount, i.balance_due, i.status
       FROM invoices i JOIN contacts c ON c.id = i.contact_id
-      WHERE i.is_deleted = 0 AND i.balance_due > 0 AND c.is_customer = 1 ORDER BY i.due_date // Already updated in previous turn
+      WHERE i.is_deleted = 0 AND i.balance_due > 0 AND c.is_customer = 1 ORDER BY i.due_date 
     `,
     )
     .all();
