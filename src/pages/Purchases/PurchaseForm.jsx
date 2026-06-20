@@ -57,8 +57,8 @@ export default function PurchaseForm() {
     });
 
     Promise.all([
-      modules.contacts.listVendors(), // 0: vendorContacts
-      modules.contacts.listCustomers(), // 1: customerContacts
+      modules.vendors.list(), // 0: vendorContacts
+      modules.customers.list(), // 1: customerContacts
       modules.gst.list(), // 2: gstList
       modules.bankAccounts.list(), // 3: bankList
     ]).then(([vendorContacts, customerContacts, gstList, bankList]) => { // Corrected destructuring
@@ -151,7 +151,7 @@ export default function PurchaseForm() {
   }
 
   async function handleVendorAdded(newVendor) {
-    const [vRows, custRows] = await Promise.all([modules.contacts.listVendors(), modules.contacts.listCustomers()]);
+    const [vRows, custRows] = await Promise.all([modules.vendors.list(), modules.customers.list()]);
     const combined = [
       ...vRows.map(v => ({ id: v.id, name: v.company_name, type: 'vendor', gstin: v.gstin })),
       ...custRows.map(c => ({ id: c.id, name: `${c.company_name} (Customer)`, type: 'customer', gstin: c.gstin }))
@@ -180,7 +180,7 @@ export default function PurchaseForm() {
       <form onSubmit={handleSubmit} className="grid gap-5 rounded-lg border border-slate-200 bg-white p-5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
-            <div className="flex justify-between items-center mb-1"> // This is fine
+            <div className="flex justify-between items-center mb-1">
               <label htmlFor="contact_id" className="block text-sm font-medium text-slate-700">Vendor</label>
               <button
                 type="button"
