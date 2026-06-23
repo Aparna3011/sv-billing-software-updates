@@ -1,8 +1,10 @@
+import PDFInvoiceStrip from "./components/PDFInvoiceStrip";
 import { Document, Page, View, Text } from "@react-pdf/renderer";
 
 import { pdfStyles } from "./pdfStyles";
 import { formatPdfDate } from "./pdfFormat";
 import { amountToWords } from "../../utils/amountToWords";
+import { formatMoney } from "./components/PDFDocumentBlocks";
 
 import PDFHeader from "./components/PDFHeader";
 import PDFCustomerCards from "./components/PDFCustomerCards";
@@ -313,6 +315,27 @@ export default function InvoicePDF({
 
           {showTotals && page.isLastPage && (
             <PDFTotals document={invoice} isInvoice />
+          )}
+          {title !== "QUOTATION" && (
+            <View
+              style={{
+                marginTop: 0,
+                marginBottom: 5,
+                borderWidth: 1,
+                borderColor: "#000",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+              }}
+            >
+              <Text>Total: Rs {formatMoney(invoice.grand_total || 0)}</Text>
+              <Text>Paid Now: Rs {formatMoney(invoice.paid_now || 0)}</Text>
+              <Text>
+                Total Paid: Rs {formatMoney(invoice.paid_amount || 0)}
+              </Text>
+              <Text>Due: Rs {formatMoney(invoice.balance_due || 0)}</Text>
+            </View>
           )}
         </View>
 
