@@ -1,8 +1,11 @@
-import { Text, View } from '@react-pdf/renderer';
-import { pdfStyles } from '../pdfStyles';
+import { Text, View } from "@react-pdf/renderer";
+import { pdfStyles } from "../pdfStyles";
 
-export default function PDFSignature({ documentMode = 'print', companyName = '' }) {
-  if (documentMode === 'print') {
+export default function PDFSignature({
+  documentMode = "print",
+  companyName = "",
+}) {
+  if (documentMode === "print") {
     return (
       <View style={pdfStyles.signPrintBox}>
         <Text style={pdfStyles.signPrintHeader}>AUTHORIZED SIGNATURE</Text>
@@ -12,11 +15,24 @@ export default function PDFSignature({ documentMode = 'print', companyName = '' 
     );
   }
 
-  if (documentMode === 'export') {
+  if (documentMode === "export") {
     return (
-      <View style={pdfStyles.digitalSignContainer}>
-        <Text style={pdfStyles.signLabel}>
-          This is a computer-generated document and does not require a physical signature.
+      <View
+        style={{
+          width: "100%",
+          alignItems: "center",
+          marginTop: 5,
+          paddingBottom: 30,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 8,
+            textAlign: "center",
+          }}
+        >
+          This is a computer-generated document and does not require a physical
+          signature.
         </Text>
       </View>
     );

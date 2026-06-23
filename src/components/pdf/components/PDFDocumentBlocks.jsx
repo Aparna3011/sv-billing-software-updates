@@ -27,8 +27,8 @@ export function DocumentFrame({ children, pageNumber = 1, totalPages = 1 }) {
         fixed
         style={{
           position: "absolute",
-          bottom: 5,
-          right: 15,
+          bottom: 20,
+          right: 20,
           fontSize: 8,
           color: "#555",
         }}
@@ -49,7 +49,12 @@ export function DetailGrid({ left = [], right = [] }) {
           ))}
         </View>
       </View>
-      <View style={[pdfStyles.infoColumn, { borderLeftWidth: 1, borderLeftColor: COLORS.border }]}>
+      <View
+        style={[
+          pdfStyles.infoColumn,
+          { borderLeftWidth: 1, borderLeftColor: COLORS.border },
+        ]}
+      >
         <View style={pdfStyles.detailsColumnLast}>
           {right.map((row) => (
             <DetailRow key={row.label} label={row.label} value={row.value} />
@@ -71,13 +76,7 @@ export function DetailRow({ label, value }) {
 
 export function PartyBlock({ title = "To", party = {}, showPan = true }) {
   const address =
-    [
-      party.address,
-      party.city,
-      party.state,
-      party.country,
-      party.pincode,
-    ]
+    [party.address, party.city, party.state, party.country, party.pincode]
       .filter(Boolean)
       .join(", ") || "-";
   const primaryName =
@@ -102,8 +101,12 @@ export function PartyBlock({ title = "To", party = {}, showPan = true }) {
           {party.email || ""}
         </Text>
       ) : null}
-      {party.gstin ? <Text style={pdfStyles.boxLine}>GSTIN: {party.gstin}</Text> : null}
-      {showPan && party.pan ? <Text style={pdfStyles.boxLine}>PAN: {party.pan}</Text> : null}
+      {party.gstin ? (
+        <Text style={pdfStyles.boxLine}>GSTIN: {party.gstin}</Text>
+      ) : null}
+      {showPan && party.pan ? (
+        <Text style={pdfStyles.boxLine}>PAN: {party.pan}</Text>
+      ) : null}
     </View>
   );
 }
@@ -112,24 +115,33 @@ export function PartyDetailsSection({ left, right }) {
   return (
     <View style={pdfStyles.infoRow}>
       <View style={pdfStyles.infoColumn}>{left}</View>
-      <View style={[pdfStyles.infoColumn, { borderLeftWidth: 1, borderLeftColor: COLORS.border }]}>
+      <View
+        style={[
+          pdfStyles.infoColumn,
+          { borderLeftWidth: 1, borderLeftColor: COLORS.border },
+        ]}
+      >
         {right}
       </View>
     </View>
   );
 }
 
-export function NotesAndSignature({ notes, companyName, documentMode = "export" }) {
+export function NotesAndSignature({
+  notes,
+  companyName,
+  documentMode = "export",
+}) {
   return (
     <View style={pdfStyles.notesSignRow} wrap={false}>
-      <View style={pdfStyles.notesCol}>
+      {/* <View style={pdfStyles.notesCol}>
         {notes ? (
           <>
             <Text style={pdfStyles.notesLabel}>Notes</Text>
             <Text style={pdfStyles.notesBody}>{notes}</Text>
           </>
         ) : null}
-      </View>
+      </View> */}
       {documentMode === "export" ? (
         <View style={pdfStyles.signCol}>
           <Signature companyName={companyName} documentMode={documentMode} />
@@ -164,7 +176,9 @@ export function SimpleTotalBox({
         ))}
         <View style={pdfStyles.grandTotalRowFull}>
           <Text style={pdfStyles.grandTotalLabel}>{grandLabel}</Text>
-          <Text style={pdfStyles.grandTotalValue}>{formatMoney(grandTotal)}</Text>
+          <Text style={pdfStyles.grandTotalValue}>
+            {formatMoney(grandTotal)}
+          </Text>
         </View>
       </View>
     </View>

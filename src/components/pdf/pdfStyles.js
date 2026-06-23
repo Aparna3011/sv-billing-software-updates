@@ -16,7 +16,7 @@ export const pdfStyles = StyleSheet.create({
   page: {
     backgroundColor: COLORS.white,
     paddingTop: 14,
-    paddingBottom: 14,
+    paddingBottom: 18,
     paddingHorizontal: 30,
     fontFamily: "Helvetica",
     fontSize: 9,
@@ -39,9 +39,8 @@ export const pdfStyles = StyleSheet.create({
   invoiceContent: {
     width: "100%",
     flexDirection: "column",
-    minHeight: "100%",
-    flexGrow: 1,
     zIndex: 1,
+    flex: 1,
   },
 
   contentBody: {
@@ -49,11 +48,10 @@ export const pdfStyles = StyleSheet.create({
   },
 
   footerBlock: {
-    position: "absolute",
     width: "100%",
-    bottom: 30,
     backgroundColor: COLORS.white,
     flexDirection: "column",
+    marginTop: 2,
   },
 
   // ===== HEADER SECTION =====
@@ -162,7 +160,6 @@ export const pdfStyles = StyleSheet.create({
     color: COLORS.dark,
     textAlign: "center",
     textDecoration: "underline",
-
   },
 
   companyInfo: {
@@ -737,15 +734,15 @@ export const pdfStyles = StyleSheet.create({
 
   // ===== BOTTOM SECTION (Bank, Terms, QR) =====
   bottomSectionOuter: {
-    marginTop: 2,
+    marginTop: "auto",
     backgroundColor: COLORS.white,
     paddingHorizontal: 2,
     paddingVertical: 0,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
-    paddingBottom:0,
-      borderBottomWidth: 1,
+    borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
+    marginBottom: 50,
   },
 
   bottomTwoCol: {
@@ -756,15 +753,17 @@ export const pdfStyles = StyleSheet.create({
   },
 
   bottomCol: {
-    width: "50%",
+    width: "100%",
     paddingHorizontal: 4,
-    borderRightWidth: 1,
-    borderRightColor: COLORS.border,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
   },
 
   bottomColLast: {
-    width: "50%",
+    width: "100%",
     paddingHorizontal: 4,
+    paddingBottom: 4,
   },
 
   bottomColThird: {
@@ -781,7 +780,7 @@ export const pdfStyles = StyleSheet.create({
 
   bottomColQr: {
     alignItems: "center",
-    marginTop: 8,
+    marginTop: 2,
   },
 
   bottomSectionTitle: {
@@ -792,8 +791,8 @@ export const pdfStyles = StyleSheet.create({
     textTransform: "uppercase",
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    // paddingBottom: 1,
-    paddingTop: 8,
+    paddingTop: 2,
+    paddingBottom: 1,
   },
 
   bottomLine: {
@@ -921,11 +920,10 @@ export const pdfStyles = StyleSheet.create({
 
   // ===== NOTES AND SIGNATURE =====
   notesSignRow: {
-    // flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     marginTop: 2,
-    paddingTop: 30,
+    paddingTop: 2,
     textAlign: "center",
   },
 
@@ -960,41 +958,41 @@ export const pdfStyles = StyleSheet.create({
   },
 
   signLabel: {
-    fontSize: 9,
-    fontWeight: "bold",
+    fontSize: 8,
     color: COLORS.text,
-    marginTop: 2,
-    // borderTopWidth: 1,
-    // borderTopColor: COLORS.border,
-    paddingTop: 2,
     textAlign: "center",
+    marginTop: 0,
+    paddingTop: 0,
   },
   digitalSignContainer: {
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
+    marginTop: 0,
+    paddingTop: 5,
+    paddingBottom: 10,
   },
 
   // ===== PRINT MODE SIGNATURE =====
-signPrintBox: {
-  width: 340,
-  // backgroundColor:"red",
-  flexDirection: "column",
-  alignItems: "flex-end",
-  justifyContent: "flex-end",
-  paddingTop: 4,
-},
+  signPrintBox: {
+    width: 340,
+    // backgroundColor:"red",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    justifyContent: "flex-end",
+    paddingTop: 0,
+  },
 
-signPrintHeader: {
-  fontSize: 9,
-  fontFamily: "Helvetica-Bold",
-  marginBottom: 15,
-  paddingTop: 6,
-  // backgroundColor:"blue",
-  borderBottomWidth: 1,
-  borderBottomColor: COLORS.border,
-  textAlign: "right",
-},
+  signPrintHeader: {
+    fontSize: 9,
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 15,
+    paddingTop: 6,
+    // backgroundColor:"blue",
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+    textAlign: "right",
+  },
 
   signPrintLine: {
     //   borderTopWidth: 1,

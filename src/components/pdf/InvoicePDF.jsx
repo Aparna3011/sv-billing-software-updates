@@ -148,7 +148,9 @@ function estimateFooterHeight({
 function estimateTotalsHeight(invoice = {}) {
   const isGstEnabled = invoice.is_gst_enabled !== 0;
   const items = invoice.items || [];
-  const gstRates = isGstEnabled ? new Set(items.map((item) => Number(item.gst_rate || 0))) : new Set();
+  const gstRates = isGstEnabled
+    ? new Set(items.map((item) => Number(item.gst_rate || 0)))
+    : new Set();
   const gstSummaryRows = isGstEnabled ? Math.max(1, gstRates.size) : 0;
   const totalRows =
     2 +
@@ -163,7 +165,8 @@ function estimateTotalsHeight(invoice = {}) {
     310,
     9,
   );
-  const leftHeight = 16 + amountWordsLines * 13 + (isGstEnabled ? 16 + gstSummaryRows * 16 : 0);
+  const leftHeight =
+    16 + amountWordsLines * 13 + (isGstEnabled ? 16 + gstSummaryRows * 16 : 0);
 
   return Math.max(78, rightHeight, leftHeight);
 }
@@ -313,7 +316,7 @@ export default function InvoicePDF({
           )}
         </View>
 
-        <View style={pdfStyles.footerBlock} wrap={false} fixed>
+        <View style={pdfStyles.footerBlock} wrap={false}>
           <PDFBottomSection
             company={company}
             qrSrc={qrSrc}
@@ -343,7 +346,7 @@ export default function InvoicePDF({
           fixed
           style={{
             position: "absolute",
-            bottom: 5,
+            bottom: -3,
             right: 15,
             fontSize: 8,
             color: "#555",
@@ -358,10 +361,17 @@ export default function InvoicePDF({
   return (
     <Document>
       {pages.map((page, index) =>
-        renderInvoicePage("Original Copy", page, index + 1),
+        renderInvoicePage(
+          title === "QUOTATION" ? "" : "Original Copy",
+          page,
+          index + 1,
+        ),
       )}
       {/* {pages.map((page, index) =>
-        renderInvoicePage("Customer Copy", page, index + 1),
+        renderInvoicePage(
+        title === "QUOTATION" ? "" : "Customer Copy", 
+        page, 
+        index + 1),
       )} */}
     </Document>
   );

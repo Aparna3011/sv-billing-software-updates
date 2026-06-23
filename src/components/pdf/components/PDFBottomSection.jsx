@@ -48,8 +48,7 @@ export default function PDFBottomSection({
           </View>
         </View>
       ) : (
-        <View style={{ flexDirection: "column" }}>
-          {/* Existing EXPORT Layout remains untouched below */}
+        <View style={{ flexDirection: "column", width: "100%" }}>
           <View style={pdfStyles.bottomCol}>
             <Text style={pdfStyles.bottomSectionTitle}>Terms & Conditions</Text>
             <PDFTerms company={company} />
@@ -57,16 +56,18 @@ export default function PDFBottomSection({
           <View style={pdfStyles.bottomColLast}>
             <Text style={pdfStyles.bottomSectionTitle}>Bank Details</Text>
             <PDFBankDetails company={company} documentMode="export" />
-            {hasQr && (
+          </View>
+          {hasQr && (
+            <View style={pdfStyles.bottomColLast}>
+              <Text style={pdfStyles.bottomSectionTitle}>QR Code</Text>
               <View style={pdfStyles.bottomColQr}>
-                <Text style={pdfStyles.bottomSectionTitle}>QR Code</Text>
                 <View style={pdfStyles.qrBox}>
                   <Image src={qrSrc} style={pdfStyles.qrImage} />
                 </View>
                 <Text style={pdfStyles.qrHint}>Scan to Pay</Text>
               </View>
-            )}
-          </View>
+            </View>
+          )}
         </View>
       )}
     </View>

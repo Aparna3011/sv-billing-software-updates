@@ -85,7 +85,7 @@ export default function RecurringBillingPDF({
             documentMode={documentMode}
           />
 
-          <View style={pdfStyles.notesSignRow} wrap={false}>
+          {/* <View style={pdfStyles.notesSignRow} wrap={false}>
             <View style={pdfStyles.notesCol} />
             <View style={pdfStyles.signCol}>
               <PDFSignature
@@ -93,7 +93,7 @@ export default function RecurringBillingPDF({
                 companyName={company.name || company.company_name || ""}
               />
             </View>
-          </View>
+          </View> */}
         </DocumentFrame>
       </Page>
     </Document>
