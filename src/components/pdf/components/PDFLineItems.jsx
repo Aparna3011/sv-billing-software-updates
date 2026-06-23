@@ -1,5 +1,6 @@
 import { Text, View } from "@react-pdf/renderer";
 import { pdfStyles } from "../pdfStyles";
+import { amountToWords } from "../../../utils/amountToWords";
 
 export const LINE_ITEMS_LAYOUT = {
   pageWidth: 595.28,
@@ -294,131 +295,275 @@ export function estimateInvoiceItemHeight(item, invoice = {}) {
   );
 }
 
+const TEXT_WIDTH_FACTOR = 0.52;
+
+export function estimateLines(text, width, fontSize) {
+  const normalized = String(text || "")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (!normalized) return 1;
+
+  const charsPerLine = Math.max(
+    1,
+    Math.floor(width / (fontSize * TEXT_WIDTH_FACTOR)),
+  );
+
+  return normalized.split(/\s+/).reduce(
+    (state, word) => {
+      const wordLength = word.length;
+      const hardLines = Math.max(1, Math.ceil(wordLength / charsPerLine));
+
+      if (hardLines > 1) {
+        return {
+          lines: state.lines + hardLines - (state.current === 0 ? 1 : 0),
+          current: wordLength % charsPerLine || charsPerLine,
+        };
+      }
+
+      const nextLength =
+        state.current === 0 ? wordLength : state.current + 1 + wordLength;
+
+      if (nextLength <= charsPerLine) {
+        return { lines: state.lines, current: nextLength };
+      }
+
+      return { lines: state.lines + 1, current: wordLength };
+    },
+    { lines: 1, current: 0 },
+  ).lines;
+}
+
+export function estimateCompanyHeaderHeight(company = {}) {
+  const pageWidth =
+    LINE_ITEMS_LAYOUT.pageWidth - LINE_ITEMS_LAYOUT.pagePaddingHorizontal * 2;
+  const companyAddressLines = estimateLines(
+    company.address || "",
+    pageWidth - 120,
+    11,
+  );
+  return Math.max(112, 104 + companyAddressLines * 4);
+}
+
+export function estimateCustomerDetailsHeight(invoice = {}) {
+  const pageWidth =
+    LINE_ITEMS_LAYOUT.pageWidth - LINE_ITEMS_LAYOUT.pagePaddingHorizontal * 2;
+  const detailsWidth = pageWidth / 2;
+  const isGstEnabled = invoice.is_gst_enabled !== 0;
+  const customer = invoice.customer || {};
+  const address =
+    invoice.address ||
+    customer.address ||
+    [
+      customer.city || invoice.city,
+      customer.state || invoice.state,
+      customer.country || invoice.country,
+      customer.pincode || invoice.pincode,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+  const addressLines = estimateLines(address || "-", detailsWidth - 12, 9);
+  const customerLines =
+    1 +
+    (customer.company || invoice.customer_company ? 1 : 0) +
+    addressLines +
+    (customer.pan || invoice.customer_pan ? 1 : 0) +
+    (customer.phone || invoice.phone || customer.email || invoice.email
+      ? 1
+      : 0) +
+    (isGstEnabled && (customer.gstin || invoice.customer_gstin || invoice.gstin)
+      ? 1
+      : 0);
+  const invoiceDetailRows = Number(invoice.paid_amount || 0) > 0 ? 5 : 3;
+  return Math.max(
+    customerLines * 11 + 8,
+    invoiceDetailRows * 13 + 4,
+  );
+}
+
+export function estimateTotalsHeight(invoice = {}) {
+  const isGstEnabled = invoice.is_gst_enabled !== 0;
+  const items = invoice.items || [];
+  const gstRates = isGstEnabled
+    ? new Set(items.map((item) => Number(item.gst_rate || 0)))
+    : new Set();
+  const gstSummaryRows = isGstEnabled ? Math.max(1, gstRates.size) : 0;
+  const totalRows =
+    2 +
+    (Number(invoice.discount || 0) > 0 ? 1 : 0) +
+    (isGstEnabled && Number(invoice.cgst_total || 0) > 0 ? 1 : 0) +
+    (isGstEnabled && Number(invoice.sgst_total || 0) > 0 ? 1 : 0) +
+    (isGstEnabled && Number(invoice.igst_total || 0) > 0 ? 1 : 0) +
+    (Number(invoice.round_off || 0) !== 0 ? 1 : 0);
+  const rightHeight = totalRows * 25;
+  const amountWordsLines = estimateLines(
+    amountToWords(Math.round(Number(invoice.grand_total || 0))),
+    310,
+    9,
+  );
+  const leftHeight =
+    16 + amountWordsLines * 13 + (isGstEnabled ? 16 + gstSummaryRows * 16 : 0);
+
+  return Math.max(78, rightHeight, leftHeight);
+}
+
+export function estimateTotalsSectionHeight(invoice = {}, title = "INVOICE") {
+  const totalsHeight = estimateTotalsHeight(invoice);
+  const paymentStripHeight = title !== "QUOTATION" ? 25 : 0;
+  return totalsHeight + paymentStripHeight;
+}
+
+export function estimateFooterHeight({
+  invoice = {},
+  company = {},
+  qrSrc = null,
+  documentMode = "print",
+  isQuotation = false,
+}) {
+  const hasQr = Boolean(qrSrc);
+  const terms = [
+    company.term1,
+    company.term2,
+    company.term3,
+    company.term4,
+    company.term5,
+  ].filter((term) => {
+    const normalized = String(term || "")
+      .replace(/\s+/g, " ")
+      .trim();
+    return Boolean(normalized);
+  });
+  const termLines = Math.max(1, terms.length || 1);
+  const termsHeight = 20 + termLines * 11;
+  const qrHeight = hasQr ? 118 : 0;
+  const bankHeight = isQuotation ? 0 : (documentMode === "print" ? 58 : 70);
+  const signatureHeight = documentMode === "print" ? 58 : 18;
+
+  let bottomSectionHeight = 0;
+  if (documentMode === "print") {
+    bottomSectionHeight = 2 + termsHeight + Math.max(bankHeight, qrHeight, signatureHeight);
+  } else {
+    bottomSectionHeight = 2 + termsHeight + bankHeight + qrHeight;
+  }
+
+  const notesLines = invoice.notes
+    ? estimateLines(
+        invoice.notes,
+        LINE_ITEMS_LAYOUT.pageWidth -
+          LINE_ITEMS_LAYOUT.pagePaddingHorizontal * 2 -
+          16,
+        9,
+      )
+    : 0;
+  const notesHeight = invoice.notes ? 18 + notesLines * 12 : 0;
+
+  const exportSignatureHeight = documentMode === "export" ? signatureHeight + 10 : 0;
+
+  return (
+    bottomSectionHeight +
+    notesHeight +
+    exportSignatureHeight +
+    LINE_ITEMS_LAYOUT.footerBottomOffset +
+    LINE_ITEMS_LAYOUT.paginationSafetyGap
+  );
+}
+
 export function paginateInvoiceItems({
   items = [],
   invoice = {},
-  itemAreaHeight,
-  totalsHeight = 0,
+  company = {},
+  qrSrc = null,
+  documentMode = "print",
+  title = "INVOICE",
 }) {
   const chunks = buildInvoiceItemChunks(items);
-  const normalCapacity = Math.max(
-    1,
-    itemAreaHeight -
-      LINE_ITEMS_LAYOUT.tableHeaderHeight -
-      LINE_ITEMS_LAYOUT.paginationSafetyGap,
-  );
-  const lastPageCapacity = Math.max(
-    1,
-    normalCapacity - totalsHeight - LINE_ITEMS_LAYOUT.paginationSafetyGap,
-  );
-
-  const remainingHeightFrom = (index) =>
-    estimatePageChunksHeight(chunks.slice(index), invoice) -
-    LINE_ITEMS_LAYOUT.tableHeaderHeight;
-
+  
+  const pageHeight = LINE_ITEMS_LAYOUT.pageHeight;
+  const verticalPadding = LINE_ITEMS_LAYOUT.pagePaddingTop + LINE_ITEMS_LAYOUT.pagePaddingBottom;
+  const tableHeaderHeight = LINE_ITEMS_LAYOUT.tableHeaderHeight;
+  const safetyGap = LINE_ITEMS_LAYOUT.paginationSafetyGap;
+  const footerReserve = 25; 
+  
+  const companyHeaderHeight = estimateCompanyHeaderHeight(company);
+  const customerDetailsHeight = estimateCustomerDetailsHeight(invoice);
+  
+  const isQuotation = title === "QUOTATION";
+  const totalsSectionHeight = estimateTotalsSectionHeight(invoice, title);
+  const footerHeight = estimateFooterHeight({
+    invoice,
+    company,
+    qrSrc,
+    documentMode,
+    isQuotation,
+  });
+  
   const pages = [];
   let cursor = 0;
-
+  let pageIndex = 0;
+  
   while (cursor < chunks.length) {
-    const remaining = remainingHeightFrom(cursor);
-
-    if (remaining <= lastPageCapacity) {
+    const isFirstPage = pageIndex === 0;
+    const remainingChunks = chunks.slice(cursor);
+    const remainingItemsHeight = estimatePageChunksHeight(remainingChunks, invoice) - tableHeaderHeight;
+    
+    const currentHeaderHeight = companyHeaderHeight + (isFirstPage ? customerDetailsHeight : 0);
+    const totalSpaceNeeded = remainingItemsHeight + tableHeaderHeight + totalsSectionHeight + footerHeight + footerReserve;
+    const availableHeightForLastPage = pageHeight - verticalPadding - currentHeaderHeight - safetyGap;
+    
+    if (totalSpaceNeeded <= availableHeightForLastPage) {
       pages.push({
-        chunks: chunks.slice(cursor),
+        chunks: remainingChunks,
+        isFirstPage,
         isLastPage: true,
       });
       break;
     }
-
+    
+    const availableHeightForItems = pageHeight - verticalPadding - currentHeaderHeight - tableHeaderHeight - safetyGap - footerReserve;
     const pageChunks = [];
-
+    
     while (cursor < chunks.length) {
       const nextChunk = chunks[cursor];
-
-      // if (wouldStartNewServiceAfterContinuation(pageChunks, nextChunk)) {
-      //   break;
-      // }
-
-      const tentativeChunks = [...pageChunks, nextChunk];
-      const tentativeHeight = estimatePageChunksHeight(
-        tentativeChunks,
-        invoice,
-      );
-      const isLastPossiblePage =
-        remainingHeightFrom(cursor) <= lastPageCapacity;
-
-      const capacity = isLastPossiblePage
-        ? lastPageCapacity + LINE_ITEMS_LAYOUT.tableHeaderHeight
-        : normalCapacity + LINE_ITEMS_LAYOUT.tableHeaderHeight;
-
-      // const restFitsOnFinalPage =
-      //   remainingHeightFrom(cursor) <= lastPageCapacity;
-
-      // if (pageChunks.length > 0 && restFitsOnFinalPage) {
-      //   break;
-      // }
-
-      if (tentativeHeight > capacity && pageChunks.length > 0) {
+      const isLastChunk = cursor === chunks.length - 1;
+      if (isLastChunk && pageChunks.length > 0) {
         break;
       }
-
+      const tentativeChunks = [...pageChunks, nextChunk];
+      const tentativeHeight = estimatePageChunksHeight(tentativeChunks, invoice);
+      
+      if (tentativeHeight > availableHeightForItems && pageChunks.length > 0) {
+        break;
+      }
+      
       pageChunks.push(nextChunk);
       cursor += 1;
     }
-
+    
     if (pageChunks.length === 0 && cursor < chunks.length) {
       pageChunks.push(chunks[cursor]);
       cursor += 1;
     }
-
+    
     pages.push({
       chunks: pageChunks,
+      isFirstPage,
       isLastPage: false,
     });
+    
+    pageIndex += 1;
   }
-
+  
   if (pages.length === 0) {
-    pages.push({ chunks: [], isLastPage: true });
+    pages.push({
+      chunks: [],
+      isFirstPage: true,
+      isLastPage: true,
+    });
   }
-
-  let normalizedPages = pages.map((page, index) => ({
-    ...page,
-    isLastPage: index === pages.length - 1,
-  }));
-
-  const maxLastPageHeight =
-    lastPageCapacity + LINE_ITEMS_LAYOUT.tableHeaderHeight;
-
-  if (normalizedPages.length > 1) {
-    const lastPage = normalizedPages[normalizedPages.length - 1];
-    const overflowChunks = [];
-
-    while (lastPage.chunks.length > 0) {
-      const currentHeight = estimatePageChunksHeight(lastPage.chunks, invoice);
-      if (currentHeight <= maxLastPageHeight) break;
-
-      overflowChunks.unshift(lastPage.chunks.pop());
-    }
-
-    if (overflowChunks.length > 0) {
-      lastPage.isLastPage = false;
-
-      if (lastPage.chunks.length === 0) {
-        normalizedPages.pop();
-      }
-
-      normalizedPages.push({
-        chunks: overflowChunks,
-        isLastPage: true,
-      });
-    }
-  }
-
-  return normalizedPages.map((page, index) => ({
-    ...page,
-    isLastPage: index === normalizedPages.length - 1,
-  }));
+  
+  return pages;
 }
+
 
 function resolveItemTax(item, invoice, isOverseas, sameState) {
   const gstRate =
