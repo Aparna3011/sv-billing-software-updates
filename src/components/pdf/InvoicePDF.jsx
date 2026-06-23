@@ -321,25 +321,31 @@ export default function InvoicePDF({
             company={company}
             qrSrc={qrSrc}
             documentMode={documentMode}
+            hasNotes={!!hasNotes}
           />
-          <View style={pdfStyles.notesSignRow} wrap={false}>
-            <View style={pdfStyles.notesCol}>
-              {invoice.notes ? (
-                <>
-                  <Text style={pdfStyles.notesLabel}>Notes</Text>
-                  <Text style={pdfStyles.notesBody}>{invoice.notes}</Text>
-                </>
-              ) : null}
+
+          {invoice.notes ? (
+            <View
+              style={{
+                paddingTop: 4,
+                paddingBottom: 20,
+                paddingLeft: 10,
+                width: "100%",
+              }}
+            >
+              <Text style={pdfStyles.notesLabel}>NOTES</Text>
+              <Text style={pdfStyles.notesBody}>{invoice.notes}</Text>
             </View>
-            {documentMode === "export" && (
-              <View style={pdfStyles.signCol}>
-                <PDFSignature
-                  documentMode={documentMode}
-                  companyName={company.name || company.company_name || ""}
-                />
-              </View>
-            )}
-          </View>
+          ) : null}
+
+          {documentMode === "export" && (
+            <View style={pdfStyles.signCol}>
+              <PDFSignature
+                documentMode={documentMode}
+                companyName={company.name || company.company_name || ""}
+              />
+            </View>
+          )}
         </View>
 
         <Text
@@ -357,6 +363,7 @@ export default function InvoicePDF({
       </View>
     </Page>
   );
+  const hasNotes = invoice.notes?.trim();
 
   return (
     <Document>

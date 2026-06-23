@@ -1,30 +1,51 @@
-import { View, Text, Image } from '@react-pdf/renderer';
+import { View, Text, Image } from "@react-pdf/renderer";
 
-import { pdfStyles, COLORS } from '../pdfStyles';
-import PDFBankDetails from './PDFBankDetails';
-import PDFTerms from './PDFTerms';
-import PDFSignature from './PDFSignature';
+import { pdfStyles, COLORS } from "../pdfStyles";
+import PDFBankDetails from "./PDFBankDetails";
+import PDFTerms from "./PDFTerms";
+import PDFSignature from "./PDFSignature";
 
 export default function PDFBottomSection({
   company = {},
   qrSrc = null,
-  documentMode = 'export',
+  documentMode = "export",
+  hasNotes = false,
 }) {
   const hasQr = Boolean(qrSrc);
-  const isPrint = documentMode === 'print';
+  const isPrint = documentMode === "print";
 
   return (
-    <View style={pdfStyles.bottomSectionOuter} wrap={false}>
+    <View
+      style={[
+        pdfStyles.bottomSectionOuter,
+        {
+          marginBottom: hasNotes ? 25 : 50,
+        },
+      ]}
+      wrap={false}
+    >
       {isPrint ? (
         <View style={{ flexDirection: "column", width: "100%" }}>
           {/* Row 1: Terms - Full Width */}
-          <View style={{ borderBottomWidth: 1, borderBottomColor: COLORS.border, paddingBottom: 4 }}>
+          <View
+            style={{
+              borderBottomWidth: 1,
+              borderBottomColor: COLORS.border,
+              paddingBottom: 4,
+            }}
+          >
             <Text style={pdfStyles.bottomSectionTitle}>Terms & Conditions</Text>
             <PDFTerms company={company} />
           </View>
 
           {/* Row 2: Bank | QR | Signature */}
-          <View style={{ flexDirection: "row", width: "100%", alignItems: "stretch" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              width: "100%",
+              alignItems: "stretch",
+            }}
+          >
             <View style={pdfStyles.bottomColThird}>
               <Text style={pdfStyles.bottomSectionTitle}>Bank Details</Text>
               <PDFBankDetails company={company} documentMode="export" />

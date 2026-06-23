@@ -734,7 +734,8 @@ export const pdfStyles = StyleSheet.create({
 
   // ===== BOTTOM SECTION (Bank, Terms, QR) =====
   bottomSectionOuter: {
-    marginTop: "auto",
+    // marginTop: "auto",
+    marginTop: 0,
     backgroundColor: COLORS.white,
     paddingHorizontal: 2,
     paddingVertical: 0,
@@ -742,7 +743,7 @@ export const pdfStyles = StyleSheet.create({
     borderTopColor: COLORS.border,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border,
-    marginBottom: 50,
+    // marginBottom: 25,
   },
 
   bottomTwoCol: {
@@ -922,9 +923,8 @@ export const pdfStyles = StyleSheet.create({
   notesSignRow: {
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 2,
-    paddingTop: 2,
-    textAlign: "center",
+    marginTop: 5,
+    paddingTop: 5,
   },
 
   notesCol: {
@@ -940,15 +940,15 @@ export const pdfStyles = StyleSheet.create({
     color: COLORS.text,
     marginBottom: 1,
     textTransform: "uppercase",
-    justifyContent: "center",
-    textAlign: "center",
+    justifyContent: "start",
+    textAlign: "start",
   },
 
   notesBody: {
     fontSize: 9,
     color: COLORS.text,
     lineHeight: 1.3,
-    textAlign: "center",
+    textAlign: "start",
   },
 
   signCol: {
@@ -970,7 +970,7 @@ export const pdfStyles = StyleSheet.create({
     justifyContent: "center",
     marginTop: 0,
     paddingTop: 5,
-    paddingBottom: 10,
+    paddingBottom: 5,
   },
 
   // ===== PRINT MODE SIGNATURE =====
