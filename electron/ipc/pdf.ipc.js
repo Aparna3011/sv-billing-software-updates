@@ -728,6 +728,7 @@ SELECT r.*,
       const invoiceProxy = {
         ...recurringData,
         items: allItems,
+        is_gst_enabled: company.enable_outgoing_gst ? 1 : 0,
         invoice_no: recurringNo,
         generated_invoice_no: generatedInvoiceNo,
         document_no: recurringNo,

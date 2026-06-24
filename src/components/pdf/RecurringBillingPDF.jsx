@@ -302,7 +302,13 @@ export default function RecurringBillingPDF({
         <View style={pdfStyles.contentBody}>
           <PDFLineItems chunks={page.chunks} invoice={recurring} />
 
-          {page.isLastPage && <PDFTotals document={recurring} isInvoice />}
+          {page.isLastPage && (
+            <>
+              {console.log("RECURRING GST FLAG:", recurring?.is_gst_enabled)}
+
+              <PDFTotals document={recurring} isInvoice />
+            </>
+          )}
         </View>
 
         {page.isLastPage && (
