@@ -70,7 +70,8 @@ const blankItem = {
 
 const defaultForm = {
   contact_id: "",
-  templates: [ // Use contact_id
+  templates: [
+    // Use contact_id
     {
       recurring_invoice_no: "",
 
@@ -218,6 +219,8 @@ const normalizeDiscountValue = (value, isPercent, subtotal) => {
 };
 
 export default function RecurringForm({ recordId }) {
+  const [globalGstEnabled, setGlobalGstEnabled] = useState(true);
+
   const [generatedRecurringNo, setGeneratedRecurringNo] = useState("");
 
   useEffect(() => {
@@ -304,13 +307,18 @@ export default function RecurringForm({ recordId }) {
       modules.services.list(),
       modules.gst.list(),
       modules.company.get(),
+      modules.settings.get({ key: "gst_enabled_outgoing" }),
     ])
-      .then(([customerRows, serviceRows, gstRows, companySettings]) => {
-        setCustomers(customerRows);
-        setServices(serviceRows);
-        setGstRates(gstRows);
-        setSettings(companySettings);
-      })
+      .then(
+        ([customerRows, serviceRows, gstRows, companySettings, gstSetting]) => {
+          setCustomers(customerRows);
+          setServices(serviceRows);
+          setGstRates(gstRows);
+          setSettings(companySettings);
+
+          setGlobalGstEnabled(gstSetting?.value !== "0");
+        },
+      )
       .catch((error) => toast.error(error.message));
   }, []);
 
@@ -341,9 +349,14 @@ export default function RecurringForm({ recordId }) {
                 start_date: template.start_date || today,
 
                 // Recalculate on load if history is corrupted (Start === Next)
-                next_invoice_date: (template.next_invoice_date === template.start_date)
-                  ? generateNextInvoiceDate(template.start_date, template.billing_cycle, template.custom_billing_cycle)
-                  : template.next_invoice_date || "",
+                next_invoice_date:
+                  template.next_invoice_date === template.start_date
+                    ? generateNextInvoiceDate(
+                        template.start_date,
+                        template.billing_cycle,
+                        template.custom_billing_cycle,
+                      )
+                    : template.next_invoice_date || "",
 
                 status: template.status || "active",
 
@@ -384,11 +397,12 @@ export default function RecurringForm({ recordId }) {
       .finally(() => setIsLoading(false));
   }, [recordId]);
   useEffect(() => {
-    if (form.contact_id) { // Use contact_id
+    if (form.contact_id) {
+      // Use contact_id
       loadCustomerInvoices(form.contact_id);
     }
   }, [form.contact_id]);
-   // Use contact_id
+  // Use contact_id
 
   const selectedCustomer = useMemo(() => {
     return customers.find((c) => Number(c.id) === Number(form.contact_id));
@@ -448,19 +462,22 @@ export default function RecurringForm({ recordId }) {
   async function save(event) {
     event.preventDefault();
 
-    try { // Use contact_id
-      if (!form.contact_id) { toast.error("Please select a customer");
+    try {
+      // Use contact_id
+      if (!form.contact_id) {
+        toast.error("Please select a customer");
         return;
       }
 
       // Filter out invalid service rows before processing totals or payload
-      const validatedTemplates = form.templates.map(t => ({
+      const validatedTemplates = form.templates.map((t) => ({
         ...t,
-        items: (t.items || []).filter(item => 
-          (item.name?.trim() || item.service_id) && 
-          Number(item.rate || 0) > 0 && 
-          Number(item.qty || 0) > 0
-        )
+        items: (t.items || []).filter(
+          (item) =>
+            (item.name?.trim() || item.service_id) &&
+            Number(item.rate || 0) > 0 &&
+            Number(item.qty || 0) > 0,
+        ),
       }));
 
       for (const template of validatedTemplates) {
@@ -565,7 +582,6 @@ export default function RecurringForm({ recordId }) {
       toast.error(error.message);
     }
   }
-
   if (isLoading) {
     return (
       <ContentArea>
@@ -619,7 +635,7 @@ export default function RecurringForm({ recordId }) {
 
                 await loadCustomerInvoices(customerId);
               }}
-             />
+            />
           </div>
 
           <div>
@@ -949,6 +965,7 @@ export default function RecurringForm({ recordId }) {
                 gst={gstRates}
                 discount={template.discount}
                 discountIsPercent={template.discount_is_percent}
+                isGstEnabled={globalGstEnabled}
                 onChange={(items) => updateTemplateItems(index, items)}
               />
 
