@@ -211,7 +211,9 @@ module.exports = (ipcMain, _getWindow, shell) => {
     "pdf:paymentReceipt",
     ok(async ({ id, documentMode = "export" }) => {
       const db = getDb();
-      const payment = db.prepare("SELECT * FROM incoming_payments WHERE id = ?").get(id);
+      const payment = db
+        .prepare("SELECT * FROM incoming_payments WHERE id = ?")
+        .get(id);
 
       if (!payment) throw new Error("Payment record not found");
 
@@ -370,8 +372,8 @@ module.exports = (ipcMain, _getWindow, shell) => {
       if (!payment) throw new Error("Purchase payment not found");
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
       const isExpense = Boolean(payment.expense_id);
-      const doc = isExpense 
-        ? buildExpenseDocument(db, payment.expense_id) 
+      const doc = isExpense
+        ? buildExpenseDocument(db, payment.expense_id)
         : buildPurchaseDocument(db, payment.purchase_id);
 
       doc.document_no = payment.payment_no;
@@ -385,7 +387,9 @@ module.exports = (ipcMain, _getWindow, shell) => {
       const document = React.createElement(PaymentReceiptPDF, {
         payment: doc,
         company,
-        title: isExpense ? "EXPENSE PAYMENT RECEIPT" : "PURCHASE PAYMENT RECEIPT",
+        title: isExpense
+          ? "EXPENSE PAYMENT RECEIPT"
+          : "PURCHASE PAYMENT RECEIPT",
         partyTitle: "Paid To",
         documentMode,
       });
@@ -949,24 +953,33 @@ function paymentSummaryForCycle(db, recurringInvoiceId, invoiceStartDate) {
   const latestPayment = db
     .prepare(
       `
-      SELECT
-        h.amount,
-        h.payment_id,
-        p.payment_no,
-        p.payment_date,
-        p.mode
-      FROM recurring_invoice_history h
-      JOIN incoming_payments p
-        ON p.id = h.payment_id
-      WHERE h.recurring_invoice_id = ?
-        AND h.invoice_start_date = ?
-        AND h.action_type = 'payment_received'
-        AND h.payment_id IS NOT NULL
-      ORDER BY p.payment_date DESC, p.id DESC
-      LIMIT 1
-    `,
+    SELECT
+      id as payment_id,
+      payment_no,
+      payment_date,
+      amount,
+      mode
+    FROM incoming_payments
+    WHERE recurring_invoice_id = ?
+    ORDER BY payment_date DESC, id DESC
+    LIMIT 1
+  `,
     )
-    .get(recurringInvoiceId, invoiceStartDate);
+    .get(recurringInvoiceId);
+
+  console.log("Recurring Plan Payment Debug");
+  console.log("recurringInvoiceId:", recurringInvoiceId);
+  console.log("invoiceStartDate:", invoiceStartDate);
+  console.log("latestPayment:", latestPayment);
+
+  console.log({
+    totalPaid: Number(summary?.total_paid || 0),
+    paidNow: Number(latestPayment?.amount || 0),
+    paymentId: latestPayment?.payment_id || null,
+    paymentNo: latestPayment?.payment_no || "",
+    paymentDate: latestPayment?.payment_date || "",
+    paymentMode: latestPayment?.mode || "",
+  });
 
   return {
     totalPaid: Number(summary?.total_paid || 0),
@@ -1018,7 +1031,9 @@ function buildRecurringDocument(
   }
 
   if (paymentId) {
-    payment = db.prepare("SELECT * FROM incoming_payments WHERE id = ?").get(paymentId);
+    payment = db
+      .prepare("SELECT * FROM incoming_payments WHERE id = ?")
+      .get(paymentId);
     if (!payment) throw new Error("Payment record not found");
     templateId = payment.recurring_invoice_id;
     history = latestHistoryForPayment(db, paymentId) || history;

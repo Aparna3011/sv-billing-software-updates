@@ -185,6 +185,12 @@ export default function RecurringBillingPDF({
   title = "RECURRING BILLING",
   documentMode = "export",
 }) {
+  console.log("RECURRING PDF DATA", {
+    payment_no: recurring.payment_no,
+    payment_date: recurring.payment_date,
+    plan_no: recurring.plan_no,
+  });
+
   const logoDataUrl =
     recurring?.logo_base64 || company?.logo_base64 || company?.logo_path;
   const party = recurring.customer || recurring;
@@ -252,21 +258,27 @@ export default function RecurringBillingPDF({
                         </Text>
                       </View>
 
-                      <View style={pdfStyles.detailsRow}>
-                        <Text style={pdfStyles.detailsLabel}>Payment No :</Text>
-                        <Text style={pdfStyles.detailsValue}>
-                          {recurring.payment_no || "-"}
-                        </Text>
-                      </View>
+                      {recurring.payment_no?.trim() ? (
+                        <>
+                          <View style={pdfStyles.detailsRow}>
+                            <Text style={pdfStyles.detailsLabel}>
+                              Payment No :
+                            </Text>
+                            <Text style={pdfStyles.detailsValue}>
+                              {recurring.payment_no}
+                            </Text>
+                          </View>
 
-                      <View style={pdfStyles.detailsRow}>
-                        <Text style={pdfStyles.detailsLabel}>
-                          Payment Date :
-                        </Text>
-                        <Text style={pdfStyles.detailsValue}>
-                          {dateValue(recurring.payment_date)}
-                        </Text>
-                      </View>
+                          <View style={pdfStyles.detailsRow}>
+                            <Text style={pdfStyles.detailsLabel}>
+                              Payment Date :
+                            </Text>
+                            <Text style={pdfStyles.detailsValue}>
+                              {dateValue(recurring.payment_date)}
+                            </Text>
+                          </View>
+                        </>
+                      ) : null}
                     </View>
                   </View>
                 </View>
@@ -279,11 +291,7 @@ export default function RecurringBillingPDF({
                   }}
                 >
                   <View style={pdfStyles.customerBoxesRow}>
-                    <PartyBlock
-                      title="TO"
-                      party={party}
-                      showPan={false}
-                    />
+                    <PartyBlock title="TO" party={party} showPan={false} />
                   </View>
                 </View>
               </View>
@@ -298,11 +306,17 @@ export default function RecurringBillingPDF({
         </View>
 
         {page.isLastPage && (
-          <PDFBottomSection
-            company={company}
-            qrSrc={qrSrc}
-            documentMode={documentMode}
-          />
+          <>
+            <PDFBottomSection
+              company={company}
+              qrSrc={qrSrc}
+              documentMode={documentMode}
+            />
+
+            {documentMode === "export" && (
+              <PDFSignature documentMode="export" />
+            )}
+          </>
         )}
 
         <Text
