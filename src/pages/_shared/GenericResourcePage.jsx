@@ -14,6 +14,7 @@ import FormInput from "../../components/forms/FormInput";
 import FormSelect from "../../components/forms/FormSelect";
 import FormTextarea from "../../components/forms/FormTextarea";
 import { Country, State, City } from "country-state-city";
+import { validators } from "../../utils/validators";
 
 export default function GenericResourcePage({
   title,
@@ -41,26 +42,54 @@ export default function GenericResourcePage({
   const [deleteRow, setDeleteRow] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [options, setOptions] = useState({});
-  const schema = useMemo(
-    () =>
-      z
-        .object(
-          Object.fromEntries(
-            fields
-              .filter(
-                (field) =>
-                  field.required &&
-                  (!editingRow || field.requiredOnEdit !== false),
-              )
-              .map((field) => [
-                field.name,
-                z.coerce.string().min(1, `${field.label} is required`),
-              ]),
-          ),
-        )
-        .passthrough(),
-    [fields, editingRow],
-  );
+  const schema = useMemo(() => {
+    const shape = {};
+
+    fields.forEach((field) => {
+      let validator = field.required
+        ? z.string().min(1, `${field.label} is required`)
+        : z.string().optional();
+
+      if (field.name === "email") {
+        validator = validator.refine(
+          (value) => !value || validators.email(value),
+          { message: "Invalid email address" },
+        );
+      }
+
+      if (field.name === "phone") {
+        validator = validator.refine(
+          (value) => !value || validators.mobile(value),
+          { message: "Invalid mobile number" },
+        );
+      }
+
+      if (field.name === "gstin") {
+        validator = validator.refine(
+          (value) => !value || validators.gstin(value),
+          { message: "Invalid GSTIN" },
+        );
+      }
+
+      if (field.name === "pan") {
+        validator = validator.refine(
+          (value) => !value || validators.pan(value),
+          { message: "Invalid PAN" },
+        );
+      }
+
+      if (field.name === "pincode") {
+        validator = validator.refine(
+          (value) => !value || validators.pincode(value),
+          { message: "Invalid Pincode" },
+        );
+      }
+
+      shape[field.name] = validator;
+    });
+
+    return z.object(shape).passthrough();
+  }, [fields, editingRow]);
 
   const [countryCode, setCountryCode] = useState("");
   const [stateCode, setStateCode] = useState("");
@@ -190,7 +219,6 @@ export default function GenericResourcePage({
   }
 
   function view(row) {
-
     if (getViewPath) navigate(getViewPath(row));
     else setViewRow(row);
   }
@@ -243,7 +271,6 @@ export default function GenericResourcePage({
   }
 
   async function remove(row) {
-
     setDeleteRow(row);
   }
 
@@ -583,6 +610,7 @@ function renderField(
       key={field.name}
       label={field.label}
       type={field.type || "text"}
+      placeholder={field.placeholder}
       error={errors[field.name]}
       {...register(field.name)}
     />

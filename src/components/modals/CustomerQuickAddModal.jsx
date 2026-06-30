@@ -106,6 +106,7 @@ export default function CustomerQuickAddModal({ isOpen, onClose, onSuccess }) {
           />
           <FormInput
             label="GSTIN"
+            placeholder="e.g., 27ABCDE1234F1Z5"
             {...register("gstin")}
             error={errors.gstin}
           />

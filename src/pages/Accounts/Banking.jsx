@@ -989,7 +989,7 @@ export default function Banking() {
       bank_account_id: row.bank_account_id,
       to_account_id: to_account_id,
       contact_id: row.contact_id || "",
-      contact_id: row.contact_id || "",
+      // contact_id: row.contact_id || "",
       invoice_id: row.invoice_id || "",
       recurring_invoice_id: row.recurring_invoice_id || "",
       expense_id: row.expense_id || "", // Populate expense_id for editing

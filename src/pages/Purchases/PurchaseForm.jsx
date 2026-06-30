@@ -157,12 +157,22 @@ export default function PurchaseForm() {
       console.log("FORM CONTACT ID:", form.contact_id);
       console.log("SELECTED PARTY:", selectedParty);
 
+      const cleanedItems = form.items.map((item) => ({
+        ...item,
+        gst_rate: globalGstSetting ? item.gst_rate : 0,
+        cgst: globalGstSetting ? item.cgst : 0,
+        sgst: globalGstSetting ? item.sgst : 0,
+        igst: globalGstSetting ? item.igst : 0,
+        taxTotal: globalGstSetting ? item.taxTotal : 0,
+      }));
+
       const payload = {
         ...form,
+        items: cleanedItems,
         bill_no: form.bill_no,
-        contact_id: selectedParty?.id, // Directly use contact_id
-        vendor: selectedParty?.name?.replace(" (Customer)", "") || form.vendor, // Keep vendor text for snapshot
-        is_gst_enabled: form.is_gst_enabled ? 1 : 0, // Include is_gst_enabled in payload
+        contact_id: selectedParty?.id,
+        vendor: selectedParty?.name?.replace(" (Customer)", "") || form.vendor,
+        is_gst_enabled: globalGstSetting ? 1 : 0,
       };
 
       if (isEdit) {
@@ -298,10 +308,11 @@ export default function PurchaseForm() {
           />
         </div>
 
-        {form.is_gst_enabled && form.contact_id && (
+        {globalGstSetting && form.contact_id && (
           <FormInput
             // Removed duplicate label and value for contact_id
             label="Vendor GSTIN" // Use contact_id
+            placeholder="e.g., 27ABCDE1234F1Z5"
             value={vendors.find((v) => v.id === form.contact_id)?.gstin || ""}
             disabled // Assuming it's read-only on the form
             className="text-slate-600"
@@ -364,7 +375,7 @@ export default function PurchaseForm() {
           }))}
           gst={gstRates}
           serviceLabel="Category"
-          isGstEnabled={form.is_gst_enabled} // Pass the flag
+          isGstEnabled={globalGstSetting}
           onChange={(items) => setForm({ ...form, items })}
         />
 

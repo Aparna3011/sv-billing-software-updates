@@ -588,6 +588,7 @@ export default function DocumentForm({ type, recordId }) {
           {form.is_gst_enabled && form.contact_id && (
             <FormInput
               label="Customer GSTIN"
+              placeholder="e.g., 27ABCDE1234F1Z5"
               value={customers.find(c => c.id === form.contact_id)?.gstin || ''}
               disabled // Assuming it's read-only on the form
               className="text-slate-600"

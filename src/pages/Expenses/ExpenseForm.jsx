@@ -51,7 +51,16 @@ export default function ExpenseForm() {
   useEffect(() => {
     // Fetch global GST setting for incoming documents
     modules.settings.get({ key: "gst_enabled_incoming" }).then((gstSetting) => {
-      setGlobalGstSetting(gstSetting?.value !== "0");
+      const enabled = gstSetting?.value !== "0";
+
+      setGlobalGstSetting(enabled);
+
+      if (!isEdit) {
+        setForm((prev) => ({
+          ...prev,
+          is_gst_enabled: enabled,
+        }));
+      }
     });
     console.log("window.api", window.api);
     console.log("window.electronAPI", window.electronAPI);
@@ -144,7 +153,7 @@ export default function ExpenseForm() {
 
   // Console logs for debugging (can be uncommented for detailed tracing)
   // console.log("[TRACE] ExpenseForm - Current Form State (render):", form); // This logs on every render, can be noisy
-console.log("FORM BEFORE SAVE:", form);
+  console.log("FORM BEFORE SAVE:", form);
   async function handleSubmit(event) {
     event.preventDefault();
     if (!form.contact_id) return toast.error("Vendor is required"); // Use contact_id
