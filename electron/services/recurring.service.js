@@ -354,7 +354,15 @@ function syncRecurringLifecycle(db, recurringInvoiceId, actionData = {}) {
   });
 
   // If completed, trigger cycle advancement logic
-  if (status === "completed" && actionData.action_type !== "cycle_generated") {
+  const todayDate = formatISO(new Date(), {
+    representation: "date",
+  });
+
+  if (
+    status === "completed" &&
+    actionData.action_type !== "cycle_generated" &&
+    todayDate >= currentNextDate
+  ) {
     // The end of the current cycle becomes the start of the next cycle
     const nextCycleStartDate = currentNextDate;
     // Calculate the actual next invoice date for the new cycle

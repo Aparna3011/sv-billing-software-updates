@@ -672,7 +672,7 @@ export default function Banking() {
           amount: Number(bankingEntry.amount),
           reference_no: bankingEntry.reference_no,
           contact_id: bankingEntry.contact_id,
-          contact_id: bankingEntry.contact_id,
+          // contact_id: bankingEntry.contact_id,
           notes: `Party: ${bankingEntry.party_name} | ${bankingEntry.notes}`,
           type: bankingEntry.type === "receipt" ? "credit" : "debit",
           category_id: bankingEntry.category_id,
