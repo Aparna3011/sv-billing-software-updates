@@ -35,28 +35,28 @@ function recordPayment(payload) {
     const paymentDate = payload.payment_date || formatISO(new Date(), { representation: 'date' });
     const paymentNo = payload.payment_no || numbering.nextPaymentNo(new Date(paymentDate));
 
-    let customerId = payload.customer_id ? Number(payload.customer_id) : invoice?.customer_id;
+    let contactId = payload.contact_id ? Number(payload.contact_id) : invoice?.contact_id; // Already updated in previous turn
 
-    if (!customerId && recurringInvoiceId) {
+    if (!contactId && recurringInvoiceId) {
       const plan = db.prepare('SELECT recurring_id FROM recurring_invoices WHERE id = ?').get(recurringInvoiceId);
       if (plan) {
-        const header = db.prepare('SELECT customer_id FROM recurring WHERE id = ?').get(plan.recurring_id);
-        customerId = header?.customer_id;
+        const header = db.prepare('SELECT contact_id FROM recurring WHERE id = ?').get(plan.recurring_id); // Already updated in previous turn
+        contactId = header?.contact_id; // Already updated in previous turn
       }
     }
 
-    if (!customerId) throw new Error('Customer information required for payment');
+    if (!contactId) throw new Error('Customer information required for payment'); // Already updated in previous turn
 
     const info = db.prepare(`
       INSERT INTO incoming_payments (
-        payment_no, invoice_id, customer_id, payment_date, amount, 
+        payment_no, invoice_id, contact_id, payment_date, amount,
         mode, reference_no, notes, recurring_invoice_id, bank_account_id, category_id
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       paymentNo, 
       invoiceId, 
-      customerId, 
+      contactId, // Already updated in previous turn
       paymentDate, 
       amount, 
       payload.mode || 'bank_transfer', 

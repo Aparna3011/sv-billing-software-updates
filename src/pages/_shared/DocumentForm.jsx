@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import toast from "@utils/notify";
 import ContentArea from "../../components/layout/ContentArea";
 import PageHeader from "../../components/layout/PageHeader";
@@ -112,7 +112,7 @@ const normalizeDiscountValue = (value, isPercent, subtotal) => {
 };
 
 const getDefaultForm = (docType) => ({
-  customer_id: "",
+  contact_id: "",
   invoice_date: today,
   quotation_date: today,
   valid_until: "",
@@ -129,6 +129,7 @@ export default function DocumentForm({ type, recordId }) {
   const navigate = useNavigate();
   const apiModule =
     type === "quotation" ? modules.quotations : modules.invoices;
+  const [searchParams] = useSearchParams();
   const [customers, setCustomers] = useState([]);
   const [gstRates, setGstRates] = useState([]);
   const [services, setServices] = useState([]);
@@ -136,6 +137,7 @@ export default function DocumentForm({ type, recordId }) {
   const [isLoading, setIsLoading] = useState(false);
   const [generatedDocumentNo, setGeneratedDocumentNo] = useState("");
   const [globalGstSetting, setGlobalGstSetting] = useState(true); // State to hold global GST setting
+  const quotationId = searchParams.get('quotationId');
 
   const [customerPopup, setCustomerPopup] = useState(false);
   useEffect(() => {
@@ -214,6 +216,34 @@ export default function DocumentForm({ type, recordId }) {
       .catch((error) => toast.error(error.message));
   }, []);
 
+  // Effect to load quotation data if converting from quotation
+  useEffect(() => {
+    if (type === 'invoice' && quotationId && !recordId) {
+      setIsLoading(true);
+      modules.quotations.get(Number(quotationId))
+        .then(quotation => {
+          if (!quotation) throw new Error("Quotation not found for conversion.");
+          setForm(prev => ({
+            ...prev,
+            contact_id: quotation.contact_id,
+            invoice_date: today, // Default to today for new invoice
+            due_date: quotation.valid_until || today, // Use quotation valid_until as due date
+            discount: quotation.discount,
+            discount_is_percent: quotation.discount_is_percent,
+            notes: quotation.notes,
+            items: quotation.items?.length
+              ? quotation.items.map(normalizeItem)
+              : [{ ...blankItem }],
+            is_gst_enabled: quotation.is_gst_enabled !== 0,
+            quotation_id: quotation.id, // Store quotation_id in form state
+          }));
+        })
+        .catch(error => toast.error(error.message))
+        .finally(() => setIsLoading(false));
+    }
+  }, [type, quotationId, recordId]);
+
+
   useEffect(() => {
     if (!recordId) return;
     setIsLoading(true);
@@ -224,7 +254,7 @@ export default function DocumentForm({ type, recordId }) {
         setForm({
           ...getDefaultForm(type),
           ...doc,
-          customer_id: doc.customer_id || "",
+          contact_id: doc.contact_id || "",
           discount: doc.discount ?? 0,
           discount_is_percent:
             doc.discount_is_percent === true ||
@@ -244,7 +274,7 @@ export default function DocumentForm({ type, recordId }) {
       })
       .catch((error) => toast.error(error.message))
       .finally(() => setIsLoading(false));
-  }, [recordId, type]);
+  }, [recordId, type, customers, services, gstRates]); // Added dependencies
 
   useEffect(() => {
     setForm((prev) => {
@@ -349,7 +379,7 @@ export default function DocumentForm({ type, recordId }) {
 
         items: normalizedItems,
 
-        customer_id: Number(form.customer_id),
+        contact_id: Number(form.contact_id),
 
         discount: normalizeDiscountValue(
           form.discount,
@@ -371,9 +401,7 @@ export default function DocumentForm({ type, recordId }) {
             id: Number(recordId),
             discount_is_percent,
           })
-        : type === "quotation"
-          ? await modules.quotations.create({ ...payload, discount_is_percent })
-          : await modules.invoices.create({ ...payload, discount_is_percent });
+        : await apiModule.create({ ...payload, discount_is_percent, quotation_id: quotationId ? Number(quotationId) : null });
       toast.success(
         recordId
           ? `${type === "quotation" ? "Quotation" : "Invoice"} updated`
@@ -445,7 +473,7 @@ export default function DocumentForm({ type, recordId }) {
     setCustomers(updatedCustomers);
     setForm((prev) => ({
       ...prev,
-      customer_id: saved.id,
+      contact_id: saved.id,
     }));
     setCustomerPopup(false);
   };
@@ -531,11 +559,11 @@ export default function DocumentForm({ type, recordId }) {
             <CustomerSelect
               name="customer"
               customers={customers}
-              value={form.customer_id}
-              onChange={(customer_id) =>
+              value={form.contact_id}
+              onChange={(contact_id) =>
                 setForm((prev) => ({
                   ...prev,
-                  customer_id,
+                  contact_id,
                 }))
               }
             />
@@ -557,10 +585,11 @@ export default function DocumentForm({ type, recordId }) {
               }))
             }
           />
-          {form.is_gst_enabled && form.customer_id && (
+          {form.is_gst_enabled && form.contact_id && (
             <FormInput
               label="Customer GSTIN"
-              value={customers.find(c => c.id === form.customer_id)?.gstin || ''}
+              placeholder="e.g., 27ABCDE1234F1Z5"
+              value={customers.find(c => c.id === form.contact_id)?.gstin || ''}
               disabled // Assuming it's read-only on the form
               className="text-slate-600"
             />

@@ -187,8 +187,7 @@ export default function QuotationDetail() {
     try {
       const result = await fn(Number(id));
       toast.success(message);
-      if (result?.invoice_no) navigate(`/invoices/${result.id}`);
-      else load();
+      load(); // Always reload the quotation after an action
     } catch (error) {
       toast.error(error.message);
     }
@@ -230,8 +229,8 @@ export default function QuotationDetail() {
   const isConverted =
     quotationStatus === "converted" || Boolean(quotation?.converted_invoice_id);
   const canApprove = quotationStatus === "draft";
-  const canCreateWorkOrder = quotationStatus === "approved" && !isConverted;
-  const canConvert = quotationStatus === "approved" && !isConverted;
+  const canCreateWorkOrder = quotationStatus === "accepted" && !isConverted;
+  const canConvert = quotationStatus === "accepted" && !isConverted;
 
   const itemRows = getQuotationItemRows(quotation || {});
 
@@ -315,9 +314,7 @@ export default function QuotationDetail() {
             )}
             {canConvert && (
               <button
-                onClick={() =>
-                  action(modules.quotations.convert, "Converted to invoice")
-                }
+                onClick={() => navigate(`/invoices/new?quotationId=${id}`)}
                 className="rounded-md bg-teal-700 px-3 py-2 text-sm text-white"
               >
                 Convert

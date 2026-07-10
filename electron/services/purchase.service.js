@@ -11,7 +11,7 @@ function today() {
 
 function vendorName(db, id, fallback) {
   if (!id) return String(fallback || "").trim();
-  const row = db.prepare("SELECT company_name FROM vendors WHERE id = ?").get(id);
+  const row = db.prepare("SELECT company_name FROM contacts WHERE id = ? AND is_vendor = 1").get(id);
   return row?.company_name || String(fallback || "").trim();
 }
 
@@ -58,11 +58,11 @@ function normalizeItems(items = [], fallback = {}) {
 
 function calculatePurchaseTotals(items, vendor, isGstEnabled = true) {
   const company = getDb().prepare("SELECT * FROM company WHERE id = 1").get();
-  const vendorAsCustomer = {
+  const vendorAsContact = {
     state: vendor?.state || company?.state || "",
     gst_treatment: "registered",
   };
-  return totalsForItems(items, company, vendorAsCustomer, 0, false, isGstEnabled);
+  return totalsForItems(items, company, vendorAsContact, 0, false, isGstEnabled);
 }
 
 function normalizePurchase(payload = {}, fallback = {}) {
@@ -70,31 +70,28 @@ function normalizePurchase(payload = {}, fallback = {}) {
   const clean = { ...fallback, ...payload };
   clean.bill_date = clean.bill_date || today();
   
-  // Handle prefixed vendor_id from frontend (e.g., "v_1" or "c_5") and ensure it's a number or null
-  let rawVid;
-  if (typeof clean.vendor_id === 'string') {
-    if (clean.vendor_id.startsWith('v_')) {
-      rawVid = parseInt(clean.vendor_id.substring(2), 10); // Extract numeric ID for vendor
-    } else if (clean.vendor_id.startsWith('c_')) {
-      rawVid = null; // Customers are not stored in vendor_id column in purchases table
-      // Ensure vendor name is captured if it's a customer
-      clean.vendor = clean.vendor || payload.vendor;
+  // Handle prefixed contact_id from frontend (e.g., "v_1" or "c_5") and ensure it's a number or null
+  let rawCid;
+  if (typeof clean.contact_id === 'string') {
+    if (clean.contact_id.startsWith('v_') || clean.contact_id.startsWith('c_')) {
+      rawCid = parseInt(clean.contact_id.substring(2), 10); // Extract numeric ID
     } else {
-      rawVid = parseInt(clean.vendor_id, 10); // Fallback for raw numeric ID
+      rawCid = parseInt(clean.contact_id, 10); // Fallback for raw numeric ID
     }
   } else {
-    rawVid = parseInt(clean.vendor_id, 10);
+    rawCid = parseInt(clean.contact_id, 10);
   }
-  clean.vendor_id = !isNaN(rawVid) && rawVid > 0 ? rawVid : null; // Ensure it's a valid number or null
+  clean.contact_id = !isNaN(rawCid) && rawCid > 0 ? rawCid : null; // Ensure it's a valid number or null
 
-  const vendor = clean.vendor_id
-    ? db.prepare("SELECT * FROM vendors WHERE id = ? AND is_deleted = 0").get(clean.vendor_id)
+  // Fetch the contact to ensure it's a vendor
+  const contact = clean.contact_id
+    ? db.prepare("SELECT * FROM contacts WHERE id = ? AND is_vendor = 1 AND is_deleted = 0").get(clean.contact_id)
     : null;
 
-  clean.vendor = vendorName(db, clean.vendor_id, clean.vendor);
-  clean.bill_no = clean.bill_no || numbering.nextBillNo(new Date(clean.bill_date));
-  clean.vendor_bill_no = clean.vendor_bill_no || "";
-  clean.due_date = clean.due_date || formatISO(addDays(new Date(clean.bill_date), Number(vendor?.payment_terms || 15)), { representation: "date" });
+  clean.vendor = vendorName(db, clean.contact_id, clean.vendor); // Use contact_id
+  clean.bill_no = clean.bill_no || numbering.nextBillNo(new Date(clean.bill_date)); // This comment is fine, it's a note
+  clean.vendor_bill_no = clean.vendor_bill_no || ""; // Keep vendor_bill_no as it's an external reference
+  clean.due_date = clean.due_date || formatISO(addDays(new Date(clean.bill_date), Number(contact?.payment_terms || 15)), { representation: "date" }); // This comment is fine, it's a note
   clean.notes = clean.notes || "";
 
   // Handle GST enabled flag
@@ -109,10 +106,10 @@ function normalizePurchase(payload = {}, fallback = {}) {
 
   const items = normalizeItems(clean.items || [], clean);
 
-  if (!clean.vendor_id) throw new Error("A valid Vendor Selection is required (Foreign Key constraint).");
+  if (!clean.contact_id) throw new Error("A valid Vendor Selection is required (Foreign Key constraint)."); // This comment is fine, it's a note
   if (!items.length) throw new Error("At least one purchase item is required");
 
-  const totals = calculatePurchaseTotals(items, vendor, clean.is_gst_enabled === 1);
+  const totals = calculatePurchaseTotals(items, contact, clean.is_gst_enabled === 1); // Use contact for GST calculation
   clean.items = totals.items.map((item) => ({
     ...item,
     name: item.name || item.service_name,
@@ -174,7 +171,7 @@ function listPurchases() {
         COALESCE(v.company_name, p.vendor) AS vendor_name,
         ba.account_name AS bank_account_name
       FROM purchases p
-      LEFT JOIN vendors v ON v.id = p.vendor_id
+      LEFT JOIN contacts v ON v.id = p.contact_id
       LEFT JOIN bank_accounts ba ON ba.id = p.bank_account_id
       WHERE p.is_deleted = 0
       ORDER BY p.bill_date DESC, p.id DESC
@@ -197,7 +194,7 @@ function getPurchase(id) {
     SELECT
       p.*,
       COALESCE(v.company_name, p.vendor) AS vendor_name,
-      v.contact_person,
+      v.contact_person, -- Use contact's contact_person
       v.phone,
       v.email,
       v.gstin,
@@ -206,7 +203,7 @@ function getPurchase(id) {
       v.state,
       ba.account_name AS bank_account_name
     FROM purchases p
-    LEFT JOIN vendors v ON v.id = p.vendor_id
+    LEFT JOIN contacts v ON v.id = p.contact_id
     LEFT JOIN bank_accounts ba ON ba.id = p.bank_account_id
     WHERE p.id = ? AND p.is_deleted = 0
   `).get(targetId);
@@ -283,24 +280,24 @@ function createPurchase(payload) {
   const clean = normalizePurchase(payload);
 
   // Task 2 & 5: Log payload and query parameters
-  console.log("[DEBUG] Table: purchases | Action: INSERT");
-  console.log("[DEBUG] SQL: INSERT INTO purchases (vendor_id, bill_no, ...) VALUES (@vendor_id, @bill_no, ...)");
-  console.log("[DEBUG] Parameters:", { vendor_id: clean.vendor_id, bill_no: clean.bill_no, vendor: clean.vendor });
+  console.log("[DEBUG] Table: purchases | Action: INSERT"); // KEEP AS IS
+  console.log("[DEBUG] SQL: INSERT INTO purchases (contact_id, bill_no, ...) VALUES (@contact_id, @bill_no, ...)"); // MUST CHANGE
+  console.log("[DEBUG] Parameters:", { contact_id: clean.contact_id, bill_no: clean.bill_no, vendor: clean.vendor }); // MUST CHANGE
 
   return db.transaction(() => {
     const info = db
       .prepare(
         `
         INSERT INTO purchases (
-          bill_date, due_date, vendor, vendor_id, bill_no, vendor_bill_no, is_gst_enabled,
-          service_name, amount, gst_rate, gst_amount, subtotal, cgst_total,
+          bill_date, due_date, vendor, contact_id, bill_no, vendor_bill_no, is_gst_enabled,
+          service_name, amount, gst_rate, gst_amount, subtotal, cgst_total, 
           sgst_total, igst_total, tax_total, grand_total, paid_amount,
           balance_due, status, notes
         )
         VALUES (
-          @bill_date, @due_date, @vendor, @vendor_id, @bill_no, @vendor_bill_no, @is_gst_enabled,
+          @bill_date, @due_date, @vendor, @contact_id, @bill_no, @vendor_bill_no, @is_gst_enabled,
           @service_name, @amount, @gst_rate, @gst_amount, @subtotal, @cgst_total,
-          @sgst_total, @igst_total, @tax_total, @grand_total, @paid_amount,
+          @sgst_total, @igst_total, @tax_total, @grand_total, @paid_amount, 
           @balance_due, @status, @notes
         )
       `,
@@ -311,7 +308,7 @@ function createPurchase(payload) {
     if (clean.paid_amount > 0) {
       recordPurchasePayment({
         purchase_id: Number(info.lastInsertRowid),
-        vendor_id: Number(clean.vendor_id), // Fix: Pass resolved numeric ID
+        contact_id: Number(clean.contact_id), // Fix: Pass resolved numeric ID
         payment_date: clean.bill_date,
         amount: clean.paid_amount,
         mode: clean.payment_mode, // Use the normalized payment_mode
@@ -358,7 +355,7 @@ function updatePurchase(payload) {
       SET bill_date = @bill_date,
           due_date = @due_date,
           vendor = @vendor,
-          vendor_id = @vendor_id,
+          contact_id = @contact_id,
           bill_no = @bill_no,
           vendor_bill_no = @vendor_bill_no,
           is_gst_enabled = @is_gst_enabled,
@@ -441,8 +438,8 @@ function recordPurchasePayment(payload) {
     const info = db
       .prepare(
         `
-        INSERT INTO outgoing_payments (
-          purchase_id, vendor_id, payment_no, payment_date, amount,
+        INSERT INTO outgoing_payments ( 
+          purchase_id, contact_id, payment_no, payment_date, amount,
           mode, reference_no, notes, bank_account_id
         )
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -450,7 +447,7 @@ function recordPurchasePayment(payload) {
       )
       .run(
         purchaseId,
-        payload.vendor_id || purchase?.vendor_id || null,
+        payload.contact_id || purchase?.contact_id || null, // This comment is fine, it's a note
         paymentNo,
         paymentDate,
         amount,

@@ -78,7 +78,7 @@ export default function PaymentForm({ invoiceId, payment, recurringInvoiceId: pr
           setForm(prev => ({
             ...prev,
             recurring_invoice_id: Number(recurringInvoiceId),
-            customer_id: plan.customer_id,
+            contact_id: plan.contact_id,
             customer_name: plan.company_name,
             plan_no: plan.recurring_invoice_no,
             amount: plan.pending_amount || plan.grand_total || 0,

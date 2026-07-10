@@ -1048,9 +1048,9 @@ function bankLedger(filters = null) {
         COALESCE(ip.payment_no, op.payment_no, bt.reference_no) AS voucher_no,
         ip.invoice_id,
         ip.recurring_invoice_id,
-        ip.customer_id,
+        ip.contact_id,
         op.purchase_id,
-        op.vendor_id,
+        op.contact_id AS vendor_contact_id,
         op.expense_id,
         CASE
           WHEN bt.source_type = 'reversal' THEN 'Reversal'
@@ -1076,8 +1076,8 @@ function bankLedger(filters = null) {
       LEFT JOIN expenses e ON e.id = bt.source_id AND bt.source_type = 'expense'
       LEFT JOIN incoming_payments ip ON ip.id = bt.source_id AND bt.source_type = 'customer_payment'
       LEFT JOIN outgoing_payments op ON op.id = bt.source_id AND (bt.source_type = 'purchase_payment' OR bt.source_type = 'manual_adjustment' OR bt.source_type = 'expense_payment')
-      LEFT JOIN customers c ON c.id = ip.customer_id
-      LEFT JOIN vendors v ON v.id = op.vendor_id
+      LEFT JOIN contacts c ON c.id = ip.contact_id AND c.is_customer = 1
+      LEFT JOIN contacts v ON v.id = op.contact_id AND v.is_vendor = 1
       LEFT JOIN invoices i ON i.id = ip.invoice_id
       LEFT JOIN recurring_invoices ri ON ri.id = ip.recurring_invoice_id
       LEFT JOIN purchases p ON p.id = op.purchase_id
@@ -1209,7 +1209,7 @@ function incomeLedger() {
     i.invoice_no,
     ri.recurring_invoice_no,
     p.payment_no,
-    c.company_name AS customer,
+    c.company_name AS customer, -- Alias for display, logic is updated
     p.mode,
     p.reference_no,
     p.amount,
@@ -1219,8 +1219,8 @@ LEFT JOIN invoices i
     ON i.id = p.invoice_id
 LEFT JOIN recurring_invoices ri
     ON ri.id = COALESCE(p.recurring_invoice_id, i.recurring_id)
-JOIN customers c
-    ON c.id = p.customer_id
+JOIN contacts c
+    ON c.id = p.contact_id AND c.is_customer = 1
 LEFT JOIN bank_accounts ba
     ON ba.id = p.bank_account_id
 LEFT JOIN bank_transactions bt
@@ -1243,7 +1243,7 @@ function outgoingLedger() {
         p.payment_no,
         v.company_name AS vendor,
         COALESCE(pur.bill_no, ex.expense_no) AS reference_doc,
-        p.amount,
+        p.amount, -- This is fine, it's the payment amount
         p.mode,
         p.reference_no,
         ba.account_name AS bank_account,
@@ -1253,8 +1253,8 @@ function outgoingLedger() {
           ELSE 'other'
         END AS source_type
       FROM outgoing_payments p
-      LEFT JOIN vendors v
-        ON v.id = p.vendor_id
+      LEFT JOIN contacts v
+        ON v.id = p.contact_id AND v.is_vendor = 1 -- Already updated in previous turn
       LEFT JOIN purchases pur
         ON pur.id = p.purchase_id
       LEFT JOIN expenses ex
@@ -1301,23 +1301,23 @@ function accountsDashboard() {
   const customers = db.prepare(`
     SELECT
         c.id AS id,
-        c.id AS customer_id,
+        c.id AS contact_id,
         c.company_name AS name,
-        (SELECT COALESCE(SUM(grand_total), 0) FROM invoices WHERE customer_id = c.id AND is_deleted = 0 AND status != 'cancelled') AS total_invoiced,
-        (SELECT COALESCE(SUM(amount), 0) FROM incoming_payments WHERE customer_id = c.id AND COALESCE(is_deleted, 0) = 0 AND invoice_id IS NOT NULL) AS total_received,
-        (SELECT COALESCE(SUM(balance_due), 0) FROM invoices WHERE customer_id = c.id AND is_deleted = 0 AND status != 'cancelled') AS customer_outstanding,
+        (SELECT COALESCE(SUM(grand_total), 0) FROM invoices WHERE contact_id = c.id AND is_deleted = 0 AND status != 'cancelled') AS total_invoiced,
+        (SELECT COALESCE(SUM(amount), 0) FROM incoming_payments WHERE contact_id = c.id AND COALESCE(is_deleted, 0) = 0 AND invoice_id IS NOT NULL) AS total_received,
+        (SELECT COALESCE(SUM(balance_due), 0) FROM invoices WHERE contact_id = c.id AND is_deleted = 0 AND status != 'cancelled') AS customer_outstanding,
         0 AS vendor_outstanding,
-        (SELECT COALESCE(SUM(balance_due), 0) FROM invoices WHERE customer_id = c.id AND is_deleted = 0 AND status != 'cancelled' AND due_date < date('now')) AS overdue,
+        (SELECT COALESCE(SUM(balance_due), 0) FROM invoices WHERE contact_id = c.id AND is_deleted = 0 AND status != 'cancelled' AND due_date < date('now')) AS overdue,
         (
           SELECT MAX(activity_date)
           FROM (
-            SELECT MAX(invoice_date) AS activity_date FROM invoices WHERE customer_id = c.id AND is_deleted = 0 AND status != 'cancelled'
+            SELECT MAX(invoice_date) AS activity_date FROM invoices WHERE contact_id = c.id AND is_deleted = 0 AND status != 'cancelled'
             UNION ALL
-            SELECT MAX(payment_date) AS activity_date FROM incoming_payments WHERE customer_id = c.id AND COALESCE(is_deleted, 0) = 0
+            SELECT MAX(payment_date) AS activity_date FROM incoming_payments WHERE contact_id = c.id AND COALESCE(is_deleted, 0) = 0
           )
         ) AS last_activity
-    FROM customers c
-    WHERE c.is_deleted = 0
+    FROM contacts c
+    WHERE c.is_deleted = 0 AND c.is_customer = 1
     ORDER BY customer_outstanding DESC
   `).all();
 
@@ -1325,74 +1325,72 @@ function accountsDashboard() {
   const vendors = db.prepare(`
     SELECT
         v.id AS id,
-        v.id AS vendor_id,
+        v.id AS contact_id,
         v.company_name AS name,
         0 AS total_invoiced,
         0 AS total_received,
-        (SELECT COALESCE(SUM(grand_total), 0) FROM purchases WHERE vendor_id = v.id AND is_deleted = 0) +
-        (SELECT COALESCE(SUM(total_amount), 0) FROM expenses WHERE vendor_id = v.id AND is_deleted = 0) AS total_purchases,
+        (SELECT COALESCE(SUM(grand_total), 0) FROM purchases WHERE contact_id = v.id AND is_deleted = 0) +
+        (SELECT COALESCE(SUM(total_amount), 0) FROM expenses WHERE contact_id = v.id AND is_deleted = 0) AS total_purchases,
         (SELECT COALESCE(SUM(op.amount), 0) 
          FROM outgoing_payments op 
          LEFT JOIN expenses e ON e.id = op.expense_id
          LEFT JOIN purchases p ON p.id = op.purchase_id
-         WHERE COALESCE(op.vendor_id, e.vendor_id, p.vendor_id) = v.id AND COALESCE(op.is_deleted, 0) = 0) AS total_paid,
-        (SELECT COALESCE(SUM(balance_due), 0) FROM purchases WHERE vendor_id = v.id AND is_deleted = 0) + 
-        (SELECT COALESCE(SUM(balance_due), 0) FROM expenses WHERE vendor_id = v.id AND is_deleted = 0) AS vendor_outstanding,
+         WHERE COALESCE(op.contact_id, e.contact_id, p.contact_id) = v.id AND COALESCE(op.is_deleted, 0) = 0) AS total_paid,
+        (SELECT COALESCE(SUM(balance_due), 0) FROM purchases WHERE contact_id = v.id AND is_deleted = 0) + 
+        (SELECT COALESCE(SUM(balance_due), 0) FROM expenses WHERE contact_id = v.id AND is_deleted = 0) AS vendor_outstanding,
         0 AS customer_outstanding,
-        (SELECT COALESCE(SUM(balance_due), 0) FROM purchases WHERE vendor_id = v.id AND is_deleted = 0 AND due_date < date('now')) +
-        (SELECT COALESCE(SUM(balance_due), 0) FROM expenses WHERE vendor_id = v.id AND is_deleted = 0 AND due_date < date('now')) AS overdue,
+        (SELECT COALESCE(SUM(balance_due), 0) FROM purchases WHERE contact_id = v.id AND is_deleted = 0 AND due_date < date('now')) +
+        (SELECT COALESCE(SUM(balance_due), 0) FROM expenses WHERE contact_id = v.id AND is_deleted = 0 AND due_date < date('now')) AS overdue,
         (
           SELECT MAX(activity_date)
           FROM (
-            SELECT MAX(bill_date) AS activity_date FROM purchases WHERE vendor_id = v.id AND is_deleted = 0
+            SELECT MAX(bill_date) AS activity_date FROM purchases WHERE contact_id = v.id AND is_deleted = 0
             UNION ALL
-            SELECT MAX(expense_date) AS activity_date FROM expenses WHERE vendor_id = v.id AND is_deleted = 0
+            SELECT MAX(expense_date) AS activity_date FROM expenses WHERE contact_id = v.id AND is_deleted = 0
             UNION ALL
-            SELECT MAX(payment_date) AS activity_date FROM outgoing_payments WHERE vendor_id = v.id AND COALESCE(is_deleted, 0) = 0
+            SELECT MAX(payment_date) AS activity_date FROM outgoing_payments WHERE contact_id = v.id AND COALESCE(is_deleted, 0) = 0
           )
         ) AS last_activity
-    FROM vendors v
-    WHERE v.is_deleted = 0
+    FROM contacts v
+    WHERE v.is_deleted = 0 AND v.is_vendor = 1
     ORDER BY vendor_outstanding DESC
   `).all();
 
   // 4. Aggregate Party Accounts (Grouped by Company Name)
   const parties = db.prepare(`
     WITH party_names AS (
-      SELECT TRIM(LOWER(company_name)) AS company_name FROM customers WHERE is_deleted = 0
-      UNION
-      SELECT TRIM(LOWER(company_name)) AS company_name FROM vendors WHERE is_deleted = 0
+      SELECT TRIM(LOWER(company_name)) AS company_name FROM contacts WHERE is_deleted = 0
     )
     SELECT 
       pn.company_name AS name,
-      (SELECT id FROM customers WHERE TRIM(LOWER(company_name)) = pn.company_name AND is_deleted = 0 LIMIT 1) AS customer_id,
-      (SELECT id FROM vendors WHERE TRIM(LOWER(company_name)) = pn.company_name AND is_deleted = 0 LIMIT 1) AS vendor_id,
+      (SELECT id FROM contacts WHERE TRIM(LOWER(company_name)) = pn.company_name AND is_deleted = 0 AND is_customer = 1 LIMIT 1) AS contact_id,
+      (SELECT id FROM contacts WHERE TRIM(LOWER(company_name)) = pn.company_name AND is_deleted = 0 AND is_vendor = 1 LIMIT 1) AS vendor_contact_id,
       -- Receivable metrics
-      COALESCE((SELECT SUM(grand_total) FROM invoices i JOIN customers c ON c.id = i.customer_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND i.is_deleted = 0 AND i.status != 'cancelled'), 0) AS total_invoiced,
-      COALESCE((SELECT SUM(amount) FROM incoming_payments ip JOIN customers c ON c.id = ip.customer_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND COALESCE(ip.is_deleted, 0) = 0 AND ip.invoice_id IS NOT NULL), 0) AS total_received,
-      COALESCE((SELECT SUM(balance_due) FROM invoices i JOIN customers c ON c.id = i.customer_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND i.is_deleted = 0 AND i.status != 'cancelled'), 0) AS customer_outstanding,
-      COALESCE((SELECT SUM(CASE WHEN i.due_date < date('now') THEN i.balance_due ELSE 0 END) FROM invoices i JOIN customers c ON c.id = i.customer_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND i.is_deleted = 0 AND i.status != 'cancelled'), 0) AS customer_overdue,
+      COALESCE((SELECT SUM(grand_total) FROM invoices i JOIN contacts c ON c.id = i.contact_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND i.is_deleted = 0 AND i.status != 'cancelled'), 0) AS total_invoiced,
+      COALESCE((SELECT SUM(amount) FROM incoming_payments ip JOIN contacts c ON c.id = ip.contact_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND COALESCE(ip.is_deleted, 0) = 0 AND ip.invoice_id IS NOT NULL), 0) AS total_received,
+      COALESCE((SELECT SUM(balance_due) FROM invoices i JOIN contacts c ON c.id = i.contact_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND i.is_deleted = 0 AND i.status != 'cancelled'), 0) AS customer_outstanding,
+      COALESCE((SELECT SUM(CASE WHEN i.due_date < date('now') THEN i.balance_due ELSE 0 END) FROM invoices i JOIN contacts c ON c.id = i.contact_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND i.is_deleted = 0 AND i.status != 'cancelled'), 0) AS customer_overdue,
       -- Payable metrics
-      COALESCE((SELECT SUM(p.grand_total) FROM purchases p JOIN vendors v ON v.id = p.vendor_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND p.is_deleted = 0), 0) +
-      COALESCE((SELECT SUM(e.total_amount) FROM expenses e JOIN vendors v ON v.id = e.vendor_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND e.is_deleted = 0), 0) AS total_purchases,
+      COALESCE((SELECT SUM(p.grand_total) FROM purchases p JOIN contacts v ON v.id = p.contact_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND p.is_deleted = 0), 0) +
+      COALESCE((SELECT SUM(e.total_amount) FROM expenses e JOIN contacts v ON v.id = e.contact_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND e.is_deleted = 0), 0) AS total_purchases,
       COALESCE((
         SELECT SUM(op.amount) 
         FROM outgoing_payments op 
         LEFT JOIN expenses e_res ON e_res.id = op.expense_id
         LEFT JOIN purchases p_res ON p_res.id = op.purchase_id
-        LEFT JOIN vendors v_res ON v_res.id = COALESCE(op.vendor_id, e_res.vendor_id, p_res.vendor_id)
+        LEFT JOIN contacts v_res ON v_res.id = COALESCE(op.contact_id, e_res.contact_id, p_res.contact_id)
         WHERE TRIM(LOWER(v_res.company_name)) = pn.company_name AND COALESCE(op.is_deleted, 0) = 0
       ), 0) AS total_paid,
-      COALESCE((SELECT SUM(p.balance_due) FROM purchases p JOIN vendors v ON v.id = p.vendor_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND p.is_deleted = 0), 0) +
-      COALESCE((SELECT SUM(e.balance_due) FROM expenses e JOIN vendors v ON v.id = e.vendor_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND e.is_deleted = 0), 0) AS vendor_outstanding,
-      COALESCE((SELECT SUM(CASE WHEN p.due_date < date('now') THEN p.balance_due ELSE 0 END) FROM purchases p JOIN vendors v ON v.id = p.vendor_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND p.is_deleted = 0), 0) +
-      COALESCE((SELECT SUM(CASE WHEN e.due_date < date('now') THEN e.balance_due ELSE 0 END) FROM expenses e JOIN vendors v ON v.id = e.vendor_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND e.is_deleted = 0), 0) AS vendor_overdue,
+      COALESCE((SELECT SUM(p.balance_due) FROM purchases p JOIN contacts v ON v.id = p.contact_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND p.is_deleted = 0), 0) +
+      COALESCE((SELECT SUM(e.balance_due) FROM expenses e JOIN contacts v ON v.id = e.contact_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND e.is_deleted = 0), 0) AS vendor_outstanding,
+      COALESCE((SELECT SUM(CASE WHEN p.due_date < date('now') THEN p.balance_due ELSE 0 END) FROM purchases p JOIN contacts v ON v.id = p.contact_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND p.is_deleted = 0), 0) +
+      COALESCE((SELECT SUM(CASE WHEN e.due_date < date('now') THEN e.balance_due ELSE 0 END) FROM expenses e JOIN contacts v ON v.id = e.contact_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND e.is_deleted = 0), 0) AS vendor_overdue,
       -- Counts
-      COALESCE((SELECT COUNT(*) FROM invoices i JOIN customers c ON c.id = i.customer_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND i.balance_due > 0 AND i.is_deleted = 0 AND i.status != 'cancelled'), 0) AS open_invoice_count,
-      COALESCE((SELECT COUNT(*) FROM purchases p JOIN vendors v ON v.id = p.vendor_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND p.balance_due > 0 AND p.is_deleted = 0), 0) + 
-      COALESCE((SELECT COUNT(*) FROM expenses e JOIN vendors v ON v.id = e.vendor_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND e.balance_due > 0 AND e.is_deleted = 0), 0) AS open_bill_count,
+      COALESCE((SELECT COUNT(*) FROM invoices i JOIN contacts c ON c.id = i.contact_id WHERE TRIM(LOWER(c.company_name)) = pn.company_name AND i.balance_due > 0 AND i.is_deleted = 0 AND i.status != 'cancelled'), 0) AS open_invoice_count,
+      COALESCE((SELECT COUNT(*) FROM purchases p JOIN contacts v ON v.id = p.contact_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND p.balance_due > 0 AND p.is_deleted = 0), 0) + 
+      COALESCE((SELECT COUNT(*) FROM expenses e JOIN contacts v ON v.id = e.contact_id WHERE TRIM(LOWER(v.company_name)) = pn.company_name AND e.balance_due > 0 AND e.is_deleted = 0), 0) AS open_bill_count,
       -- Recurring metrics
-      COALESCE((SELECT SUM(h.pending_amount) FROM recurring_invoice_history h JOIN recurring_invoices ri ON ri.id = h.recurring_invoice_id JOIN recurring r ON r.id = ri.recurring_id JOIN customers cust ON cust.id = r.customer_id WHERE TRIM(LOWER(cust.company_name)) = pn.company_name AND h.id IN (SELECT MAX(id) FROM recurring_invoice_history GROUP BY recurring_invoice_id)), 0) AS recurring_outstanding
+      COALESCE((SELECT SUM(h.pending_amount) FROM recurring_invoice_history h JOIN recurring_invoices ri ON ri.id = h.recurring_invoice_id JOIN recurring r ON r.id = ri.recurring_id JOIN contacts cust ON cust.id = r.contact_id WHERE TRIM(LOWER(cust.company_name)) = pn.company_name AND h.id IN (SELECT MAX(id) FROM recurring_invoice_history GROUP BY recurring_invoice_id)), 0) AS recurring_outstanding
     FROM party_names pn
     ORDER BY name ASC
   `).all();
@@ -1432,59 +1430,59 @@ function getPartyStatement(payload) {
   console.log("[DIAGNOSTIC] Incoming companyName:", companyName);
   console.log("[DIAGNOSTIC] Normalized searchName:", searchName);
 
-  const customerMatch = db.prepare("SELECT id, company_name FROM customers WHERE id = ? OR TRIM(LOWER(company_name)) = ?").get(customerId, searchName);
-  const vendorMatch = db.prepare("SELECT id, company_name FROM vendors WHERE id = ? OR TRIM(LOWER(company_name)) = ?").get(vendorId, searchName);
+  const customerMatch = db.prepare("SELECT id, company_name, opening_balance FROM contacts WHERE (id = ? OR TRIM(LOWER(company_name)) = ?) AND is_customer = 1").get(customerId, searchName);
+  const vendorMatch = db.prepare("SELECT id, company_name, opening_balance FROM contacts WHERE (id = ? OR TRIM(LOWER(company_name)) = ?) AND is_vendor = 1").get(vendorId, searchName);
 
   // Calculate Fresh Summary for Header
   const customer_outstanding = db.prepare(`
     SELECT COALESCE(SUM(balance_due), 0) as s 
     FROM invoices 
-    WHERE customer_id = ? AND is_deleted = 0 AND status != 'cancelled'
+    WHERE contact_id = ? AND is_deleted = 0 AND status != 'cancelled'
   `).get(customerMatch?.id || -1).s;
 
   // Aggregate Total Sales for Summary
   const customer_generated = db.prepare(`
     SELECT COALESCE(SUM(grand_total), 0) as s 
     FROM invoices 
-    WHERE customer_id = ? AND is_deleted = 0 AND status != 'cancelled'
+    WHERE contact_id = ? AND is_deleted = 0 AND status != 'cancelled'
   `).get(customerMatch?.id || -1).s;
 
   // Aggregate Total Received for Summary
   const customer_received = db.prepare(`
     SELECT COALESCE(SUM(amount), 0) as s 
     FROM incoming_payments 
-    WHERE customer_id = ? AND is_deleted = 0 AND invoice_id IS NOT NULL
+    WHERE contact_id = ? AND is_deleted = 0 AND invoice_id IS NOT NULL
   `).get(customerMatch?.id || -1).s;
 
   const customer_overdue = db.prepare(`
     SELECT COALESCE(SUM(balance_due), 0) as s 
     FROM invoices 
-    WHERE customer_id = ? AND is_deleted = 0 AND status != 'cancelled' AND due_date < date('now')
+    WHERE contact_id = ? AND is_deleted = 0 AND status != 'cancelled' AND due_date < date('now')
   `).get(customerMatch?.id || -1).s;
 
   const open_invoice_count = db.prepare(`
     SELECT COUNT(*) as c 
     FROM invoices 
-    WHERE customer_id = ? AND is_deleted = 0 AND status != 'cancelled' AND balance_due > 0
+    WHERE contact_id = ? AND is_deleted = 0 AND status != 'cancelled' AND balance_due > 0
   `).get(customerMatch?.id || -1).c;
 
   const vendor_outstanding = db.prepare(` 
     SELECT 
-      (SELECT COALESCE(SUM(balance_due), 0) FROM purchases WHERE vendor_id = ? AND is_deleted = 0) +
-      (SELECT COALESCE(SUM(balance_due), 0) FROM expenses WHERE vendor_id = ? AND is_deleted = 0) as s
+      (SELECT COALESCE(SUM(balance_due), 0) FROM purchases WHERE contact_id = ? AND is_deleted = 0) +
+      (SELECT COALESCE(SUM(balance_due), 0) FROM expenses WHERE contact_id = ? AND is_deleted = 0) as s
   `).get(vendorMatch?.id || -1, vendorMatch?.id || -1).s;
 
   const vendor_overdue = db.prepare(`
     SELECT 
-      (SELECT COALESCE(SUM(balance_due), 0) FROM purchases WHERE vendor_id = ? AND is_deleted = 0 AND due_date < date('now')) +
-      (SELECT COALESCE(SUM(balance_due), 0) FROM expenses WHERE vendor_id = ? AND is_deleted = 0 AND due_date < date('now')) as s
+      (SELECT COALESCE(SUM(balance_due), 0) FROM purchases WHERE contact_id = ? AND is_deleted = 0 AND due_date < date('now')) +
+      (SELECT COALESCE(SUM(balance_due), 0) FROM expenses WHERE contact_id = ? AND is_deleted = 0 AND due_date < date('now')) as s
   `).get(vendorMatch?.id || -1, vendorMatch?.id || -1).s;
 
   // Aggregate Total Purchases for Summary
   const vendor_generated = db.prepare(`
     SELECT 
-      (SELECT COALESCE(SUM(grand_total), 0) FROM purchases WHERE vendor_id = ? AND is_deleted = 0) +
-      (SELECT COALESCE(SUM(total_amount), 0) FROM expenses WHERE vendor_id = ? AND is_deleted = 0) as s
+      (SELECT COALESCE(SUM(grand_total), 0) FROM purchases WHERE contact_id = ? AND is_deleted = 0) +
+      (SELECT COALESCE(SUM(total_amount), 0) FROM expenses WHERE contact_id = ? AND is_deleted = 0) as s
   `).get(vendorMatch?.id || -1, vendorMatch?.id || -1).s;
 
   // Aggregate Total Paid for Summary
@@ -1493,13 +1491,13 @@ function getPartyStatement(payload) {
     FROM outgoing_payments op
     LEFT JOIN expenses e ON e.id = op.expense_id
     LEFT JOIN purchases p ON p.id = op.purchase_id
-    WHERE COALESCE(op.vendor_id, e.vendor_id, p.vendor_id) = ? AND COALESCE(op.is_deleted, 0) = 0
+    WHERE COALESCE(op.contact_id, e.contact_id, p.contact_id) = ? AND COALESCE(op.is_deleted, 0) = 0
   `).get(vendorMatch?.id || -1).s;
 
   const open_bill_count = db.prepare(`
     SELECT 
-      (SELECT COUNT(*) FROM purchases WHERE vendor_id = ? AND is_deleted = 0 AND balance_due > 0) +
-      (SELECT COUNT(*) FROM expenses WHERE vendor_id = ? AND is_deleted = 0 AND balance_due > 0) as c
+      (SELECT COUNT(*) FROM purchases WHERE contact_id = ? AND is_deleted = 0 AND balance_due > 0) +
+      (SELECT COUNT(*) FROM expenses WHERE contact_id = ? AND is_deleted = 0 AND balance_due > 0) as c
   `).get(vendorMatch?.id || -1, vendorMatch?.id || -1).c;
 
 
@@ -1509,19 +1507,19 @@ function getPartyStatement(payload) {
     SELECT COALESCE(SUM(amount), 0) as s FROM recurring_invoice_history h
     JOIN recurring_invoices ri ON ri.id = h.recurring_invoice_id
     JOIN recurring r ON r.id = ri.recurring_id
-    WHERE r.customer_id = ? AND h.action_type = 'cycle_generated'
+    WHERE r.contact_id = ? AND h.action_type = 'cycle_generated'
   `).get(customerMatch?.id || -1).s;
 
   const recurring_collected = db.prepare(`
     SELECT COALESCE(SUM(amount), 0) as s FROM incoming_payments
-    WHERE customer_id = ? AND recurring_invoice_id IS NOT NULL AND COALESCE(is_deleted, 0) = 0
+    WHERE ip.contact_id = ? AND ip.recurring_invoice_id IS NOT NULL AND COALESCE(ip.is_deleted, 0) = 0
   `).get(customerMatch?.id || -1).s;
 
   const recurring_outstanding = db.prepare(`
     SELECT COALESCE(SUM(h.pending_amount), 0) as s FROM recurring_invoice_history h
     JOIN recurring_invoices ri ON ri.id = h.recurring_invoice_id
     JOIN recurring r ON r.id = ri.recurring_id
-    WHERE r.customer_id = ? AND h.id IN (SELECT MAX(id) FROM recurring_invoice_history GROUP BY recurring_invoice_id)
+    WHERE r.contact_id = ? AND h.id IN (SELECT MAX(id) FROM recurring_invoice_history GROUP BY recurring_invoice_id)
   `).get(customerMatch?.id || -1).s;
 
   console.log("[DIAGNOSTIC] Resolved Customer ID:", customerMatch?.id);
@@ -1531,7 +1529,7 @@ function getPartyStatement(payload) {
   const invoices = db.prepare(`
     SELECT i.*
     FROM invoices i
-    JOIN customers c ON c.id = i.customer_id
+    JOIN contacts c ON c.id = i.contact_id AND c.is_customer = 1
     WHERE (c.id = ? OR TRIM(LOWER(c.company_name)) = ?) AND i.is_deleted = 0 AND i.status != 'cancelled'
     ORDER BY i.invoice_date DESC
   `).all(customerMatch?.id || -1, searchName);
@@ -1541,12 +1539,12 @@ function getPartyStatement(payload) {
   const bills = db.prepare(`
     SELECT 'Purchase' as type, p.id, p.bill_date as date, p.bill_no as doc_no, p.grand_total as amount, p.paid_amount, p.balance_due, p.status
     FROM purchases p
-    JOIN vendors v ON v.id = p.vendor_id
+    JOIN contacts v ON v.id = p.contact_id AND v.is_vendor = 1
     WHERE (v.id = ? OR TRIM(LOWER(v.company_name)) = ?) AND p.is_deleted = 0
     UNION ALL
     SELECT 'Expense' as type, e.id, e.expense_date as date, e.expense_no as doc_no, e.total_amount as amount, e.paid_amount, e.balance_due, e.status
     FROM expenses e
-    JOIN vendors v ON v.id = e.vendor_id
+    JOIN contacts v ON v.id = e.contact_id AND v.is_vendor = 1
     WHERE (v.id = ? OR TRIM(LOWER(v.company_name)) = ?) AND e.is_deleted = 0
     ORDER BY date DESC
   `).all(vendorMatch?.id || -1, searchName, vendorMatch?.id || -1, searchName);
@@ -1555,27 +1553,27 @@ function getPartyStatement(payload) {
   // 3. Combined Financial Timeline
   const rawTimeline = db.prepare(`
     SELECT 'Invoice' as type, invoice_date as date, invoice_no as ref, grand_total as debit, 0 as credit
-    FROM invoices i JOIN customers c ON c.id = i.customer_id
-    WHERE (c.id = ? OR TRIM(LOWER(c.company_name)) = ?) AND i.is_deleted = 0 AND i.status != 'cancelled'
+    FROM invoices i JOIN contacts c ON c.id = i.contact_id AND c.is_customer = 1
+    WHERE (i.contact_id = ? OR TRIM(LOWER(c.company_name)) = ?) AND i.is_deleted = 0 AND i.status != 'cancelled'
     UNION ALL
     SELECT 'Receipt' as type, payment_date as date, payment_no as ref, 0 as debit, amount as credit
-    FROM incoming_payments ip JOIN customers c ON c.id = ip.customer_id
-    WHERE (c.id = ? OR TRIM(LOWER(c.company_name)) = ?) AND COALESCE(ip.is_deleted, 0) = 0
+    FROM incoming_payments ip JOIN contacts c ON c.id = ip.contact_id AND c.is_customer = 1
+    WHERE (ip.contact_id = ? OR TRIM(LOWER(c.company_name)) = ?) AND COALESCE(ip.is_deleted, 0) = 0
     UNION ALL
     SELECT 'Purchase' as type, bill_date as date, bill_no as ref, 0 as debit, grand_total as credit
-    FROM purchases p JOIN vendors v ON v.id = p.vendor_id
-    WHERE (v.id = ? OR TRIM(LOWER(v.company_name)) = ?) AND p.is_deleted = 0
+    FROM purchases p JOIN contacts v ON v.id = p.contact_id AND v.is_vendor = 1
+    WHERE (p.contact_id = ? OR TRIM(LOWER(v.company_name)) = ?) AND p.is_deleted = 0
     UNION ALL
     SELECT 'Expense' as type, expense_date as date, expense_no as ref, 0 as debit, total_amount as credit
-    FROM expenses e JOIN vendors v ON v.id = e.vendor_id
-    WHERE (v.id = ? OR TRIM(LOWER(v.company_name)) = ?) AND e.is_deleted = 0
+    FROM expenses e JOIN contacts v ON v.id = e.contact_id AND v.is_vendor = 1
+    WHERE (e.contact_id = ? OR TRIM(LOWER(v.company_name)) = ?) AND e.is_deleted = 0
     UNION ALL
     SELECT 'Vendor Payment' as type, op.payment_date as date, op.payment_no as ref, op.amount as debit, 0 as credit
     FROM outgoing_payments op 
     LEFT JOIN expenses e ON e.id = op.expense_id
     LEFT JOIN purchases p ON p.id = op.purchase_id
-    LEFT JOIN vendors v ON v.id = COALESCE(op.vendor_id, e.vendor_id, p.vendor_id)
-    WHERE (v.id = ? OR TRIM(LOWER(v.company_name)) = ?) AND COALESCE(op.is_deleted, 0) = 0
+    LEFT JOIN contacts v ON v.id = COALESCE(op.contact_id, e.contact_id, p.contact_id) AND v.is_vendor = 1
+    WHERE (COALESCE(op.contact_id, e.contact_id, p.contact_id) = ? OR TRIM(LOWER(v.company_name)) = ?) AND COALESCE(op.is_deleted, 0) = 0
     ORDER BY date ASC
   `).all(customerMatch?.id || -1, searchName, customerMatch?.id || -1, searchName, vendorMatch?.id || -1, searchName, vendorMatch?.id || -1, searchName, vendorMatch?.id || -1, searchName);
 
@@ -1584,7 +1582,7 @@ function getPartyStatement(payload) {
   const vendorOB = Number(vendorMatch?.opening_balance || 0);
   const netOpening = round(customerOB - vendorOB);
 
-  let running = netOpening;
+  let running = round(customerOB - vendorOB); // Initial balance for the timeline
   const timelineEntries = rawTimeline.map(item => {
     running += (item.debit - item.credit);
     return { ...item, balance: round(running) };

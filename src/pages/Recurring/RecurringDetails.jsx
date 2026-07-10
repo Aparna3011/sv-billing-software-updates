@@ -66,14 +66,16 @@ export default function RecurringDetail() {
   };
 
   const toggleInvoices = (pid) => {
-    setExpandedInvoices(prev => ({ ...prev, [pid]: !prev[pid] }));
+    setExpandedInvoices((prev) => ({ ...prev, [pid]: !prev[pid] }));
   };
 
   const togglePayments = (pid) => {
-    setExpandedPayments(prev => ({ ...prev, [pid]: !prev[pid] }));
+    setExpandedPayments((prev) => ({ ...prev, [pid]: !prev[pid] }));
   };
 
-  const templates = (recurring?.templates || []).filter((t) => t.is_active === 1);
+  const templates = (recurring?.templates || []).filter(
+    (t) => t.is_active === 1,
+  );
 
   async function printCycleInvoice(historyId) {
     const toastId = toast.loading("Preparing print...");
@@ -124,10 +126,7 @@ export default function RecurringDetail() {
     setIsGenerating(true);
     const toastId = toast.loading("Exporting plan PDF...");
     try {
-      await modules.pdf.recurringPlan(
-        { id: Number(id), templateId },
-        "export",
-      );
+      await modules.pdf.recurringPlan({ id: Number(id), templateId }, "export");
       toast.success("Plan PDF exported", { id: toastId });
     } catch (error) {
       toast.error(error.message, { id: toastId });
@@ -372,11 +371,22 @@ export default function RecurringDetail() {
             const hasIgst = !isOverseas && !sameState;
             const hasCgstSgst = !isOverseas && sameState;
 
-            const planHistory = (recurring?.history || []).filter(h => h.recurring_invoice_id === invoice.id);
+            const planHistory = (recurring?.history || [])
+              .filter((h) => h.recurring_invoice_id === invoice.id)
+              .sort(
+                (a, b) =>
+                  new Date(b.invoice_start_date) -
+                  new Date(a.invoice_start_date),
+              );
 
-            // Identify cycles for the summary
-            const currentCycle = planHistory[0];
-            const nextScheduled = planHistory.find(h => h.action_type === 'cycle_generated');
+            const currentCycle =
+              planHistory.find(
+                (h) => h.invoice_start_date === invoice.start_date,
+              ) ||
+              planHistory.find((h) => h.action_type === "cycle_generated") ||
+              planHistory[0];
+
+            const nextScheduled = currentCycle?.next_invoice_date;
 
             return (
               <div
@@ -391,7 +401,10 @@ export default function RecurringDetail() {
                         {invoice.recurring_invoice_no}
                       </div>
                       <div className="mt-1 text-xs text-slate-500">
-                        Frequency: <span className="capitalize font-bold text-slate-700">{invoice.billing_cycle?.replace('_', ' ')}</span>
+                        Frequency:{" "}
+                        <span className="capitalize font-bold text-slate-700">
+                          {invoice.billing_cycle?.replace("_", " ")}
+                        </span>
                       </div>
                     </div>
 
@@ -423,16 +436,10 @@ export default function RecurringDetail() {
                             ? "bg-slate-100 text-slate-400 cursor-not-allowed"
                             : "bg-teal-50 text-teal-700 hover:bg-teal-100"
                         }`}
-                        title={
-                          isCompleted
-                            ? "Fully Paid"
-                            : "Receive payment"
-                        }
+                        title={isCompleted ? "Fully Paid" : "Receive payment"}
                       >
                         <Banknote size={14} />
-                        {isCompleted
-                          ? "Paid"
-                          : "Receive Payment"}
+                        {isCompleted ? "Paid" : "Receive Payment"}
                       </button>
                       <StatusBadge
                         status={
@@ -485,7 +492,8 @@ export default function RecurringDetail() {
                   </div>
 
                   {Boolean(isPlanStopped) &&
-                    !invoice.status === "completed" && (invoice.stopped_reason || recurring?.stopped_reason) && (
+                    !invoice.status === "completed" &&
+                    (invoice.stopped_reason || recurring?.stopped_reason) && (
                       <div className="mt-3 rounded bg-red-50 p-2 border-l-4 border-red-400">
                         <p className="text-xs text-red-800">
                           <strong>Reason:</strong>{" "}
@@ -500,24 +508,40 @@ export default function RecurringDetail() {
                   {isPlanStopped ? (
                     <>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Plan Status</p>
-                        <p className="text-lg font-black text-rose-600 uppercase">Stopped</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Plan Status
+                        </p>
+                        <p className="text-lg font-black text-rose-600 uppercase">
+                          Stopped
+                        </p>
                       </div>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stopped On</p>
-                        <p className="text-lg font-bold text-slate-800">{date(currentCycle?.created_at)}</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Stopped On
+                        </p>
+                        <p className="text-lg font-bold text-slate-800">
+                          {date(currentCycle?.created_at)}
+                        </p>
                       </div>
                       <div className="flex items-center">
-                        <p className="text-xs font-medium text-slate-500 italic">No future invoices will be generated.</p>
+                        <p className="text-xs font-medium text-slate-500 italic">
+                          No future invoices will be generated.
+                        </p>
                       </div>
                     </>
                   ) : (
                     <>
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Current Cycle</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Current Cycle
+                        </p>
                         <div className="flex items-center gap-2">
-                          <StatusBadge status={currentCycle?.collection_status || 'pending'} />
-                          {currentCycle?.collection_status === 'completed' && (
+                          <StatusBadge
+                            status={
+                              currentCycle?.collection_status || "pending"
+                            }
+                          />
+                          {currentCycle?.collection_status === "completed" && (
                             <span className="text-[10px] font-bold text-emerald-600">
                               Paid on {date(currentCycle.paid_on_date)}
                             </span>
@@ -527,23 +551,41 @@ export default function RecurringDetail() {
 
                       <div className="space-y-1">
                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                          {currentCycle?.collection_status === 'partially_paid' ? 'Remaining Balance' : 'Amount Due'}
+                          {currentCycle?.collection_status === "partially_paid"
+                            ? "Remaining Balance"
+                            : "Amount Due"}
                         </p>
-                        <p className={`text-xl font-black ${(currentCycle?.cycle_pending_amount || 0) > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
-                          {money(currentCycle?.cycle_pending_amount ?? currentCycle?.pending_amount ?? 0)}
+                        <p
+                          className={`text-xl font-black ${(currentCycle?.cycle_pending_amount || 0) > 0 ? "text-rose-600" : "text-emerald-600"}`}
+                        >
+                          {money(
+                            currentCycle?.cycle_pending_amount ??
+                              currentCycle?.pending_amount ??
+                              0,
+                          )}
                         </p>
-                        {currentCycle?.collection_status === 'partially_paid' && (
+                        {currentCycle?.collection_status ===
+                          "partially_paid" && (
                           <p className="text-[10px] font-bold text-slate-400">
-                            Paid: {money(currentCycle.cycle_paid_amount ?? currentCycle.paid_amount)}
+                            Paid:{" "}
+                            {money(
+                              currentCycle.cycle_paid_amount ??
+                                currentCycle.paid_amount,
+                            )}
                           </p>
                         )}
                       </div>
 
                       <div className="space-y-1">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Next Invoice Date</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                          Next Invoice Date
+                        </p>
                         <div className="flex items-center gap-2">
                           <p className="text-lg font-bold text-slate-800">
-                            {date(currentCycle?.next_invoice_date || invoice.next_invoice_date)}
+                            {date(
+                              currentCycle?.next_invoice_date ||
+                                invoice.next_invoice_date,
+                            )}
                           </p>
                           {nextScheduled && (
                             <span className="px-2 py-0.5 rounded bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-tighter border border-blue-100">
@@ -558,96 +600,205 @@ export default function RecurringDetail() {
 
                 {/* ERP HIERARCHY: HISTORY & PAYMENTS */}
                 <div className="bg-white px-4 py-2 border-b border-slate-100">
-                   {/* Collapsible Generated Invoices */}
-                   <div className="border-b border-slate-50">
-                      <button onClick={() => toggleInvoices(invoice.id)} className="flex w-full items-center justify-between py-3 text-xs font-bold uppercase text-slate-500 hover:text-teal-600">
-                         <span className="flex items-center gap-2">Generated Invoice Cycles {expandedInvoices[invoice.id] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</span>
-                      </button>
-                      {expandedInvoices[invoice.id] && (
-                         <div className="pb-4 overflow-x-auto">
-                            <table className="w-full text-left text-xs border border-slate-100">
-                               <thead className="bg-slate-50 text-slate-500">
-                                  <tr>
-                                     <th className="px-3 py-2">Invoice No</th>
-                                     <th className="px-3 py-2">Billing Period</th>
-                                     <th className="px-3 py-2">Invoice Date</th>
-                                     <th className="px-3 py-2">Due Date</th>
-                                     <th className="px-3 py-2 text-right">Total</th>
-                                     <th className="px-3 py-2 text-right">Paid</th>
-                                     <th className="px-3 py-2 text-right">Due</th>
-                                     <th className="px-3 py-2 text-center">Status</th>
-                                     <th className="px-3 py-2 text-center">Actions</th>
-                                  </tr>
-                               </thead>
-                               <tbody className="divide-y divide-slate-100">
-                                  {planHistory.filter(h => ['cycle_generated', 'invoice_generated', 'plan_created'].includes(h.action_type)).map((h, hi) => (
-                                     <tr key={hi}>
-                                        <td className="px-3 py-2 font-bold text-slate-700">{h.generated_invoice_no || 'Proforma'}</td>
-                                        <td className="px-3 py-2">{date(h.invoice_start_date)} → {date(h.next_invoice_date)}</td>
-                                        <td className="px-3 py-2">{date(h.invoice_date || h.invoice_start_date)}</td>
-                                        <td className="px-3 py-2">{date(h.due_date)}</td>
-                                        <td className="px-3 py-2 text-right">{money(h.grand_total)}</td>
-                                        <td className="px-3 py-2 text-right text-emerald-600">{money(h.cycle_paid_amount ?? h.paid_amount)}</td>
-                                        <td className="px-3 py-2 text-right text-red-600">{money(h.cycle_pending_amount ?? h.pending_amount)}</td>
-                                        <td className="px-3 py-2 text-center">
-                                          <StatusBadge status={h.action_type === 'cycle_generated' ? 'upcoming' : (h.cycle_collection_status || h.collection_status)} />
-                                        </td>
-                                        <td className="px-3 py-2 text-center">
-                                           <div className="flex flex-wrap items-center justify-center gap-2">
-                                             <button onClick={() => printCycleInvoice(h.id)} className="text-teal-600 hover:underline">Print Invoice</button>
-                                             <button onClick={() => exportCycleInvoice(h.id)} className="text-teal-700 hover:underline">Export Invoice</button>
-                                             {(h.cycle_payment_id || h.payment_id) && (
-                                               <button onClick={() => exportReceipt(h.cycle_payment_id || h.payment_id)} className="text-blue-600 hover:underline">Export Receipt</button>
-                                             )}
-                                           </div>
-                                        </td>
-                                     </tr>
-                                  ))}
-                               </tbody>
-                            </table>
-                         </div>
-                      )}
-                   </div>
+                  {/* Collapsible Generated Invoices */}
+                  <div className="border-b border-slate-50">
+                    <button
+                      onClick={() => toggleInvoices(invoice.id)}
+                      className="flex w-full items-center justify-between py-3 text-xs font-bold uppercase text-slate-500 hover:text-teal-600"
+                    >
+                      <span className="flex items-center gap-2">
+                        Generated Invoice Cycles{" "}
+                        {expandedInvoices[invoice.id] ? (
+                          <ChevronUp size={14} />
+                        ) : (
+                          <ChevronDown size={14} />
+                        )}
+                      </span>
+                    </button>
+                    {expandedInvoices[invoice.id] && (
+                      <div className="pb-4 overflow-x-auto">
+                        <table className="w-full text-left text-xs border border-slate-100">
+                          <thead className="bg-slate-50 text-slate-500">
+                            <tr>
+                              <th className="px-3 py-2">Invoice No</th>
+                              <th className="px-3 py-2">Billing Period</th>
+                              <th className="px-3 py-2">Invoice Date</th>
+                              <th className="px-3 py-2">Due Date</th>
+                              <th className="px-3 py-2 text-right">Total</th>
+                              <th className="px-3 py-2 text-right">Paid</th>
+                              <th className="px-3 py-2 text-right">Due</th>
+                              <th className="px-3 py-2 text-center">Status</th>
+                              <th className="px-3 py-2 text-center">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {planHistory
+                              .filter((h) =>
+                                [
+                                  "cycle_generated",
+                                  "invoice_generated",
+                                  "plan_created",
+                                ].includes(h.action_type),
+                              )
+                              .map((h, hi) => (
+                                <tr key={hi}>
+                                  <td className="px-3 py-2 font-bold text-slate-700">
+                                    {h.generated_invoice_no || "Proforma"}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {date(h.invoice_start_date)} →{" "}
+                                    {date(h.next_invoice_date)}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {date(
+                                      h.invoice_date || h.invoice_start_date,
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {date(h.due_date)}
+                                  </td>
+                                  <td className="px-3 py-2 text-right">
+                                    {money(h.grand_total)}
+                                  </td>
+                                  <td className="px-3 py-2 text-right text-emerald-600">
+                                    {money(
+                                      h.cycle_paid_amount ?? h.paid_amount,
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-right text-red-600">
+                                    {money(
+                                      h.cycle_pending_amount ??
+                                        h.pending_amount,
+                                    )}
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    <StatusBadge
+                                      status={
+                                        h.action_type === "cycle_generated"
+                                          ? "upcoming"
+                                          : h.cycle_collection_status ||
+                                            h.collection_status
+                                      }
+                                    />
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    <div className="flex flex-wrap items-center justify-center gap-2">
+                                      <button
+                                        onClick={() => printCycleInvoice(h.id)}
+                                        className="text-teal-600 hover:underline"
+                                      >
+                                        Print Invoice
+                                      </button>
+                                      <button
+                                        onClick={() => exportCycleInvoice(h.id)}
+                                        className="text-teal-700 hover:underline"
+                                      >
+                                        Export Invoice
+                                      </button>
+                                      {(h.cycle_payment_id || h.payment_id) && (
+                                        <button
+                                          onClick={() =>
+                                            exportReceipt(
+                                              h.cycle_payment_id ||
+                                                h.payment_id,
+                                            )
+                                          }
+                                          className="text-blue-600 hover:underline"
+                                        >
+                                          Export Receipt
+                                        </button>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
 
-                   {/* Collapsible Payment History */}
-                   <div>
-                      <button onClick={() => togglePayments(invoice.id)} className="flex w-full items-center justify-between py-3 text-xs font-bold uppercase text-slate-500 hover:text-blue-600">
-                         <span className="flex items-center gap-2">Payment History {expandedPayments[invoice.id] ? <ChevronUp size={14}/> : <ChevronDown size={14}/>}</span>
-                      </button>
-                      {expandedPayments[invoice.id] && (
-                         <div className="pb-4 overflow-x-auto">
-                            <table className="w-full text-left text-xs border border-slate-100">
-                               <thead className="bg-slate-50 text-slate-500">
-                                  <tr>
-                                     <th className="px-3 py-2">Payment No</th>
-                                     <th className="px-3 py-2">Against Invoice</th>
-                                     <th className="px-3 py-2">Payment Date</th>
-                                     <th className="px-3 py-2 text-right">Amount</th>
-                                     <th className="px-3 py-2">Mode</th>
-                                     <th className="px-3 py-2 text-center">Receipt</th>
-                                  </tr>
-                               </thead>
-                               <tbody className="divide-y divide-slate-100">
-                                  {planHistory.filter(h => h.action_type === 'payment_received').map((h, pi) => (
-                                     <tr key={pi}>
-                                        <td className="px-3 py-2 font-bold text-blue-700">{h.payment_no}</td>
-                                        <td className="px-3 py-2 text-slate-500">{h.generated_invoice_no || h.recurring_invoice_no || "-"}</td>
-                                        <td className="px-3 py-2">{date(h.payment_date)}</td>
-                                        <td className="px-3 py-2 text-right font-bold text-slate-900">{money(h.amount)}</td>
-                                        <td className="px-3 py-2 capitalize">{h.mode?.replace('_', ' ')}</td>
-                                        <td className="px-3 py-2 text-center">
-                                           <button onClick={() => exportReceipt(h.payment_id)} className="text-blue-600 hover:underline">Export Receipt</button>
-                                        </td>
-                                     </tr>
-                                  ))}
-                                  {!planHistory.some(h => h.action_type === 'payment_received') && (
-                                     <tr><td colSpan={6} className="px-3 py-4 text-center text-slate-400 italic">No payments recorded for this plan</td></tr>
-                                  )}
-                               </tbody>
-                            </table>
-                         </div>
-                      )}
-                   </div>
+                  {/* Collapsible Payment History */}
+                  <div>
+                    <button
+                      onClick={() => togglePayments(invoice.id)}
+                      className="flex w-full items-center justify-between py-3 text-xs font-bold uppercase text-slate-500 hover:text-blue-600"
+                    >
+                      <span className="flex items-center gap-2">
+                        Payment History{" "}
+                        {expandedPayments[invoice.id] ? (
+                          <ChevronUp size={14} />
+                        ) : (
+                          <ChevronDown size={14} />
+                        )}
+                      </span>
+                    </button>
+                    {expandedPayments[invoice.id] && (
+                      <div className="pb-4 overflow-x-auto">
+                        <table className="w-full text-left text-xs border border-slate-100">
+                          <thead className="bg-slate-50 text-slate-500">
+                            <tr>
+                              <th className="px-3 py-2">Payment No</th>
+                              <th className="px-3 py-2">Against Invoice</th>
+                              <th className="px-3 py-2">Payment Date</th>
+                              <th className="px-3 py-2 text-right">Amount</th>
+                              <th className="px-3 py-2">Mode</th>
+                              <th className="px-3 py-2 text-center">Receipt</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {planHistory
+                              .filter(
+                                (h) => h.action_type === "payment_received",
+                              )
+                              .map((h, pi) => (
+                                <tr key={pi}>
+                                  <td className="px-3 py-2 font-bold text-blue-700">
+                                    {h.payment_no}
+                                  </td>
+                                  <td className="px-3 py-2 text-slate-500">
+                                    {h.generated_invoice_no ||
+                                      h.recurring_invoice_no ||
+                                      "-"}
+                                  </td>
+                                  <td className="px-3 py-2">
+                                    {date(h.payment_date)}
+                                  </td>
+                                  <td className="px-3 py-2 text-right font-bold text-slate-900">
+                                    {money(h.amount)}
+                                  </td>
+                                  <td className="px-3 py-2 capitalize">
+                                    {h.mode?.replace("_", " ")}
+                                  </td>
+                                  <td className="px-3 py-2 text-center">
+                                    <button
+                                      onClick={() =>
+                                        exportReceipt(h.payment_id)
+                                      }
+                                      className="text-blue-600 hover:underline"
+                                    >
+                                      Export Receipt
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            {!planHistory.some(
+                              (h) => h.action_type === "payment_received",
+                            ) && (
+                              <tr>
+                                <td
+                                  colSpan={6}
+                                  className="px-3 py-4 text-center text-slate-400 italic"
+                                >
+                                  No payments recorded for this plan
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -881,8 +1032,12 @@ export default function RecurringDetail() {
 function DetailItem({ label, value, className = "" }) {
   return (
     <div>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5">{label}</p>
-      <p className={`text-xs font-bold text-slate-800 ${className}`}>{value || '-'}</p>
+      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mb-0.5">
+        {label}
+      </p>
+      <p className={`text-xs font-bold text-slate-800 ${className}`}>
+        {value || "-"}
+      </p>
     </div>
   );
 }

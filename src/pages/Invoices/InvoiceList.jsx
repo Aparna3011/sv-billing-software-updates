@@ -27,7 +27,7 @@ export default function InvoiceList() {
       searchKeys={["invoice_no", "company_name"]}
       fields={[
         {
-          name: "customer_id",
+          name: "contact_id",
           label: "Customer ID",
           type: "number",
           required: true,

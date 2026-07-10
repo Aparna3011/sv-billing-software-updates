@@ -18,7 +18,7 @@ export default function VendorList() {
         { name: 'contact_person', label: 'Contact Person' },
         { name: 'email', label: 'Email', type: 'email' },
         { name: 'phone', label: 'Phone' },
-        { name: 'gstin', label: 'GSTIN' },
+        { name: 'gstin', label: 'GSTIN', placeholder: 'e.g., 27ABCDE1234F1Z5' },
         { 
           name: 'gst_treatment', 
           label: 'GST Treatment', 

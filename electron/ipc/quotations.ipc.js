@@ -26,7 +26,7 @@ module.exports = (ipcMain) => {
       ) AS service_items
 
     FROM quotations q
-    JOIN customers c ON c.id = q.customer_id
+    JOIN contacts c ON c.id = q.contact_id
 
     WHERE q.is_deleted = 0
 
@@ -53,7 +53,7 @@ module.exports = (ipcMain) => {
     ok(({ id }) => {
       getDb()
         .prepare(
-          "UPDATE quotations SET status = 'approved' WHERE id = ? AND status != 'converted'",
+          "UPDATE quotations SET status = 'accepted' WHERE id = ? AND status != 'converted'",
         )
         .run(id);
       activity.log("quotation:approved", {
@@ -68,7 +68,7 @@ module.exports = (ipcMain) => {
     ok(({ id }) => {
       getDb()
         .prepare(
-          "UPDATE quotations SET status = 'rejected' WHERE id = ? AND status != 'converted'",
+          "UPDATE quotations SET status = 'declined' WHERE id = ? AND status != 'converted'",
         )
         .run(id);
       activity.log("quotation:rejected", {
@@ -77,10 +77,6 @@ module.exports = (ipcMain) => {
       });
       return quotations.getQuotation(id);
     }),
-  );
-  ipcMain.handle(
-    "quotations:convert",
-    ok(({ id }) => quotations.convertToInvoice(id)),
   );
   ipcMain.handle(
     "quotations:delete",

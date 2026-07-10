@@ -394,7 +394,7 @@ export default function CompanyInfo() {
           </h2>
 
           <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-            <FormInput label="GSTIN" {...register("gstin")} />
+            <FormInput label="GSTIN" placeholder="e.g., 27ABCDE1234F1Z5" {...register("gstin")} />
 
             <FormInput label="PAN" {...register("pan")} />
 
@@ -412,6 +412,8 @@ export default function CompanyInfo() {
             <FormInput label="Bank Name" {...register("bank_name")} />
 
             <FormInput label="Account Number" {...register("bank_account")} />
+
+            <FormInput label="Branch Name" {...register("bank_branch")} />
 
             <FormInput label="IFSC Code" {...register("ifsc")} />
 

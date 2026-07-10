@@ -20,11 +20,11 @@ const exportColumns = [
 
 export default function VendorLedgerReport() {
   const [vendors, setVendors] = useState([]);
-  const [filters, setFilters] = useState({ vendor_id: "", from_date: "", to_date: "" });
+  const [filters, setFilters] = useState({ contact_id: "", from_date: "", to_date: "" });
   const [ledger, setLedger] = useState({ openingBalance: 0, entries: [], closingBalance: 0 });
 
   async function load(nextFilters = filters) {
-    if (!nextFilters.vendor_id) {
+    if (!nextFilters.contact_id) {
       setLedger({ openingBalance: 0, entries: [], closingBalance: 0 });
       return;
     }
@@ -37,7 +37,7 @@ export default function VendorLedgerReport() {
 
   useEffect(() => {
     load().catch((error) => toast.error(error.message));
-  }, [filters.vendor_id]);
+  }, [filters.contact_id]);
 
   const exportRows = useMemo(
     () =>
@@ -61,7 +61,7 @@ export default function VendorLedgerReport() {
       />
 
       <div className="grid grid-cols-4 gap-4 rounded-lg border border-slate-200 bg-white p-5">
-        <FormSelect label="Vendor" value={filters.vendor_id} onChange={(event) => setFilters({ ...filters, vendor_id: event.target.value })}>
+        <FormSelect label="Vendor" value={filters.contact_id} onChange={(event) => setFilters({ ...filters, contact_id: event.target.value })}>
           <option value="">Select vendor</option>
           {vendors.map((vendor) => (
             <option key={vendor.id} value={vendor.id}>

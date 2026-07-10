@@ -17,6 +17,14 @@ const { pdfStyles } = require("../../src/components/pdf/pdfStyles.js");
 
 const QuotationPDF =
   require("../../src/components/pdf/QuotationPDF.jsx").default;
+const RecurringBillingPDF =
+  require("../../src/components/pdf/RecurringBillingPDF.jsx").default;
+const PurchaseBillPDF =
+  require("../../src/components/pdf/PurchaseBillPDF.jsx").default;
+const ExpenseVoucherPDF =
+  require("../../src/components/pdf/ExpenseVoucherPDF.jsx").default;
+const PaymentReceiptPDF =
+  require("../../src/components/pdf/PaymentReceiptPDF.jsx").default;
 const { round } = require("../services/gst.service"); // Import round function for consistent rounding
 
 function roundAmount(value) {
@@ -140,10 +148,6 @@ module.exports = (ipcMain, _getWindow, shell) => {
       const document = React.createElement(QuotationPDF, {
         quotation: doc,
         company,
-        qrSrc: company.upi_id
-          ? await QRCode.toDataURL(`upi://pay?pa=${company.upi_id}`)
-          : null,
-        title: "QUOTATION",
         documentMode,
       });
 
@@ -175,8 +179,8 @@ module.exports = (ipcMain, _getWindow, shell) => {
       const db = getDb();
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
       const doc = buildRecurringDocument(db, { historyId });
-      const document = React.createElement(InvoicePDF, {
-        invoice: doc,
+      const document = React.createElement(RecurringBillingPDF, {
+        recurring: doc,
         company,
         qrSrc: await buildUpiQr(company, doc),
         title: "RECURRING INVOICE",
@@ -207,7 +211,9 @@ module.exports = (ipcMain, _getWindow, shell) => {
     "pdf:paymentReceipt",
     ok(async ({ id, documentMode = "export" }) => {
       const db = getDb();
-      const payment = db.prepare("SELECT * FROM incoming_payments WHERE id = ?").get(id);
+      const payment = db
+        .prepare("SELECT * FROM incoming_payments WHERE id = ?")
+        .get(id);
 
       if (!payment) throw new Error("Payment record not found");
 
@@ -273,13 +279,12 @@ module.exports = (ipcMain, _getWindow, shell) => {
       if (payment.notes) invoice.notes = payment.notes;
 
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
-      const qrSrc = await buildUpiQr(company, invoice);
 
-      const document = React.createElement(InvoicePDF, {
-        invoice,
+      const document = React.createElement(PaymentReceiptPDF, {
+        payment: invoice,
         company,
-        qrSrc,
         title: "PAYMENT RECEIPT",
+        partyTitle: "Received From",
         documentMode,
       });
 
@@ -309,11 +314,9 @@ module.exports = (ipcMain, _getWindow, shell) => {
       const db = getDb();
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
       const expense = buildExpenseDocument(db, id);
-      const document = React.createElement(InvoicePDF, {
-        invoice: expense,
+      const document = React.createElement(ExpenseVoucherPDF, {
+        expense,
         company,
-        qrSrc: null,
-        title: "EXPENSE VOUCHER",
         documentMode,
       });
       const exportsDir = getExportsDir();
@@ -338,11 +341,9 @@ module.exports = (ipcMain, _getWindow, shell) => {
       const db = getDb();
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
       const purchase = buildPurchaseDocument(db, id);
-      const document = React.createElement(InvoicePDF, {
-        invoice: purchase,
+      const document = React.createElement(PurchaseBillPDF, {
+        purchase,
         company,
-        qrSrc: null,
-        title: "PURCHASE BILL",
         documentMode,
       });
       const exportsDir = getExportsDir();
@@ -371,8 +372,8 @@ module.exports = (ipcMain, _getWindow, shell) => {
       if (!payment) throw new Error("Purchase payment not found");
       const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
       const isExpense = Boolean(payment.expense_id);
-      const doc = isExpense 
-        ? buildExpenseDocument(db, payment.expense_id) 
+      const doc = isExpense
+        ? buildExpenseDocument(db, payment.expense_id)
         : buildPurchaseDocument(db, payment.purchase_id);
 
       doc.document_no = payment.payment_no;
@@ -383,11 +384,13 @@ module.exports = (ipcMain, _getWindow, shell) => {
       doc.payment_mode = payment.mode;
       doc.notes = payment.notes || doc.notes;
 
-      const document = React.createElement(InvoicePDF, {
-        invoice: doc,
+      const document = React.createElement(PaymentReceiptPDF, {
+        payment: doc,
         company,
-        qrSrc: null,
-        title: isExpense ? "EXPENSE PAYMENT RECEIPT" : "PURCHASE PAYMENT RECEIPT",
+        title: isExpense
+          ? "EXPENSE PAYMENT RECEIPT"
+          : "PURCHASE PAYMENT RECEIPT",
+        partyTitle: "Paid To",
         documentMode,
       });
       const exportsDir = getExportsDir();
@@ -471,8 +474,8 @@ module.exports = (ipcMain, _getWindow, shell) => {
         templateId,
       });
 
-      const document = React.createElement(InvoicePDF, {
-        invoice,
+      const document = React.createElement(RecurringBillingPDF, {
+        recurring: invoice,
         company,
         qrSrc: await buildUpiQr(company, invoice),
         title: "RECURRING BILLING",
@@ -526,7 +529,7 @@ SELECT r.*,
        c.country,
        co.state as company_state
        FROM recurring r
-          JOIN customers c ON c.id = r.customer_id
+          JOIN contacts c ON c.id = r.contact_id
           CROSS JOIN company co ON co.id = 1
           WHERE r.id = ?
         `,
@@ -663,7 +666,7 @@ SELECT r.*,
             roundAmount(Number(t.grand_total || 0) - tPaid),
           );
 
-          // // Debug log for calculation auditing
+          // Debug log for calculation auditing
           // console.log({
           //   recurring_invoice_id: t.id,
           //   invoice_start_date: cycleStartDate,
@@ -725,6 +728,7 @@ SELECT r.*,
       const invoiceProxy = {
         ...recurringData,
         items: allItems,
+        is_gst_enabled: company.enable_outgoing_gst ? 1 : 0,
         invoice_no: recurringNo,
         generated_invoice_no: generatedInvoiceNo,
         document_no: recurringNo,
@@ -803,8 +807,8 @@ SELECT r.*,
         }
       }
 
-      const document = React.createElement(InvoicePDF, {
-        invoice: invoiceProxy,
+      const document = React.createElement(RecurringBillingPDF, {
+        recurring: invoiceProxy,
         company,
         qrSrc,
         title: "RECURRING BILLING",
@@ -859,7 +863,7 @@ function loadRecurringPlanContext(db, templateId, recurringId) {
       SELECT
         ri.*,
         r.id AS recurring_id,
-        r.customer_id,
+        r.contact_id,
 
         c.company_name,
         c.contact_person,
@@ -874,8 +878,8 @@ function loadRecurringPlanContext(db, templateId, recurringId) {
       FROM recurring_invoices ri
       JOIN recurring r
         ON r.id = ri.recurring_id
-      JOIN customers c
-        ON c.id = r.customer_id
+      JOIN contacts c
+        ON c.id = r.contact_id
       WHERE ri.id = ?
         AND (? IS NULL OR r.id = ?)
     `,
@@ -950,24 +954,33 @@ function paymentSummaryForCycle(db, recurringInvoiceId, invoiceStartDate) {
   const latestPayment = db
     .prepare(
       `
-      SELECT
-        h.amount,
-        h.payment_id,
-        p.payment_no,
-        p.payment_date,
-        p.mode
-      FROM recurring_invoice_history h
-      JOIN incoming_payments p
-        ON p.id = h.payment_id
-      WHERE h.recurring_invoice_id = ?
-        AND h.invoice_start_date = ?
-        AND h.action_type = 'payment_received'
-        AND h.payment_id IS NOT NULL
-      ORDER BY p.payment_date DESC, p.id DESC
-      LIMIT 1
-    `,
+    SELECT
+      id as payment_id,
+      payment_no,
+      payment_date,
+      amount,
+      mode
+    FROM incoming_payments
+    WHERE recurring_invoice_id = ?
+    ORDER BY payment_date DESC, id DESC
+    LIMIT 1
+  `,
     )
-    .get(recurringInvoiceId, invoiceStartDate);
+    .get(recurringInvoiceId);
+
+  console.log("Recurring Plan Payment Debug");
+  console.log("recurringInvoiceId:", recurringInvoiceId);
+  console.log("invoiceStartDate:", invoiceStartDate);
+  console.log("latestPayment:", latestPayment);
+
+  console.log({
+    totalPaid: Number(summary?.total_paid || 0),
+    paidNow: Number(latestPayment?.amount || 0),
+    paymentId: latestPayment?.payment_id || null,
+    paymentNo: latestPayment?.payment_no || "",
+    paymentDate: latestPayment?.payment_date || "",
+    paymentMode: latestPayment?.mode || "",
+  });
 
   return {
     totalPaid: Number(summary?.total_paid || 0),
@@ -1019,7 +1032,9 @@ function buildRecurringDocument(
   }
 
   if (paymentId) {
-    payment = db.prepare("SELECT * FROM incoming_payments WHERE id = ?").get(paymentId);
+    payment = db
+      .prepare("SELECT * FROM incoming_payments WHERE id = ?")
+      .get(paymentId);
     if (!payment) throw new Error("Payment record not found");
     templateId = payment.recurring_invoice_id;
     history = latestHistoryForPayment(db, paymentId) || history;
@@ -1198,7 +1213,7 @@ function buildExpenseDocument(db, id) {
         co.invoice_footer,
         co.tagline
       FROM expenses e
-      LEFT JOIN vendors v ON v.id = e.vendor_id
+      LEFT JOIN contacts v ON v.id = e.contact_id
       LEFT JOIN expense_categories ec ON ec.id = e.category_id
       LEFT JOIN bank_accounts ba ON ba.id = e.bank_account_id
       JOIN company co ON co.id = 1
@@ -1276,7 +1291,7 @@ function buildPurchaseDocument(db, id) {
         co.invoice_footer,
         co.tagline
       FROM purchases p
-      LEFT JOIN vendors v ON v.id = p.vendor_id
+      LEFT JOIN contacts v ON v.id = p.contact_id
       LEFT JOIN bank_accounts ba ON ba.id = p.bank_account_id
       JOIN company co ON co.id = 1
       WHERE p.id = ?
@@ -1367,8 +1382,8 @@ c.country,
 
     FROM invoices i
 
-    JOIN customers c
-      ON c.id = i.customer_id
+    JOIN contacts c
+      ON c.id = i.contact_id
 
     JOIN company co
       ON co.id = 1
@@ -1518,8 +1533,8 @@ function getQuotationPdfData(id) {
 
     FROM quotations q
 
-    JOIN customers c
-      ON c.id = q.customer_id
+    JOIN contacts c
+      ON c.id = q.contact_id
 
     JOIN company co
       ON co.id = 1

@@ -18,7 +18,6 @@ export const modules = {
     ...crud("quotations"),
     approve: (id) => call("quotations:approve", { id }),
     reject: (id) => call("quotations:reject", { id }),
-    convert: (id) => call("quotations:convert", { id }),
   },
   invoices: {
     ...crud("invoices"),

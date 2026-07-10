@@ -31,7 +31,7 @@ export default function OutgoingPaymentList() {
       fields={[
         { name: 'payment_no', label: 'Payment No', requiredOnEdit: false },
         { name: 'payment_date', label: 'Date', type: 'date', required: true },
-        { name: 'vendor_id', label: 'Vendor / Party', type: 'select', options: 'vendors', required: true },
+        { name: 'contact_id', label: 'Vendor / Party', type: 'select', options: 'vendors', required: true },
         { name: 'purchase_bill_no', label: 'Purchase Bill', requiredOnEdit: false },
         { name: 'category_id', label: 'Category', type: 'select', options: 'categories', required: true },
         { name: 'amount', label: 'Amount', type: 'number', required: true },

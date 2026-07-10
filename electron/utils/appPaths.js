@@ -11,7 +11,7 @@ function getDataDir() {
 }
 
 function getDbPath() {
-  return path.join(getDataDir(), 'sv-it-hub-billing.db');
+  return path.join(getDataDir(), 'sv-billing.db');
 }
 
 function getExportsDir() {

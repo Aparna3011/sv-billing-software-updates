@@ -1,26 +1,11 @@
 import { Link } from "react-router-dom";
-import { FileDown, FilePlus2, Pencil } from "lucide-react";
-import toast from "@utils/notify";
+import { FilePlus2, Pencil } from "lucide-react";
 import GenericResourcePage from "../_shared/GenericResourcePage";
 import StatusBadge from "../../components/status/StatusBadge";
 import { modules } from "../../utils/api";
 import { money, date } from "../../utils/format";
 
-const isConvertedQuotation = (row) =>
-  String(row?.status || "").toLowerCase() === "converted" ||
-  Boolean(row?.converted_invoice_id);
-
 export default function QuotationList() {
-  async function exportPdf(row) {
-    const toastId = toast.loading("Creating quotation PDF...");
-    try {
-      await modules.pdf.quotation(row.id, "export");
-      toast.success("Quotation PDF exported", { id: toastId });
-    } catch (error) {
-      toast.error(error.message, { id: toastId });
-    }
-  }
-
   return (
     <GenericResourcePage
       title="Quotations"
@@ -29,7 +14,7 @@ export default function QuotationList() {
       disableInlineEdit
       fields={[
         {
-          name: "customer_id",
+          name: "contact_id",
           label: "Customer ID",
           type: "number",
           required: true,
@@ -105,7 +90,7 @@ export default function QuotationList() {
       getViewPath={(row) => `/quotations/${row.id}`}
       rowActions={(row) => (
         <div className="flex items-center gap-1">
-          {!isConvertedQuotation(row) && (
+          {String(row.status || "").toLowerCase() !== "converted" && (
             <Link
               title="Edit"
               to={`/quotations/${row.id}/edit`}
@@ -114,16 +99,9 @@ export default function QuotationList() {
               <Pencil size={16} />
             </Link>
           )}
-          <button
-            title="Export PDF"
-            onClick={() => exportPdf(row)}
-            className="rounded p-1.5 text-teal-700 hover:bg-teal-50"
-          >
-            <FileDown size={16} />
-          </button>
         </div>
       )}
-      canDeleteRow={(row) => !isConvertedQuotation(row)}
+      canDeleteRow={() => true}
       extraAction={
         <Link
           to="/quotations/new"

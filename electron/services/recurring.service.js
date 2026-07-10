@@ -56,7 +56,11 @@ function getActiveCycleRow(db, recurringInvoiceId, activeStartDate) {
     .get(recurringInvoiceId, activeStartDate);
 }
 
-function deleteDuplicateGeneratedCycles(db, recurringInvoiceId, cycleStartDate) {
+function deleteDuplicateGeneratedCycles(
+  db,
+  recurringInvoiceId,
+  cycleStartDate,
+) {
   if (!cycleStartDate) return;
 
   db.prepare(
@@ -73,12 +77,7 @@ function deleteDuplicateGeneratedCycles(db, recurringInvoiceId, cycleStartDate) 
             AND date(invoice_start_date) = date(?)
         )
     `,
-  ).run(
-    recurringInvoiceId,
-    cycleStartDate,
-    recurringInvoiceId,
-    cycleStartDate,
-  );
+  ).run(recurringInvoiceId, cycleStartDate, recurringInvoiceId, cycleStartDate);
 }
 
 function deleteGeneratedCyclesAfter(db, recurringInvoiceId, cycleStartDate) {
@@ -180,7 +179,7 @@ function syncRecurringLifecycle(db, recurringInvoiceId, actionData = {}) {
       `
       SELECT 
         ri.*, 
-        r.customer_id,
+        r.contact_id, 
         COALESCE(ri.start_date, date('now')) as current_cycle_start
       FROM recurring_invoices ri 
       JOIN recurring r ON r.id = ri.recurring_id 
@@ -198,10 +197,9 @@ function syncRecurringLifecycle(db, recurringInvoiceId, actionData = {}) {
   if (actionData.action_type === "payment_voided") {
     deleteGeneratedCyclesAfter(db, recurringInvoiceId, currentStartDate);
     if (currentStartDate) {
-      db.prepare("UPDATE recurring_invoices SET start_date = ? WHERE id = ?").run(
-        currentStartDate,
-        recurringInvoiceId,
-      );
+      db.prepare(
+        "UPDATE recurring_invoices SET start_date = ? WHERE id = ?",
+      ).run(currentStartDate, recurringInvoiceId);
     }
   }
 
@@ -356,7 +354,15 @@ function syncRecurringLifecycle(db, recurringInvoiceId, actionData = {}) {
   });
 
   // If completed, trigger cycle advancement logic
-  if (status === "completed" && actionData.action_type !== "cycle_generated") {
+  const todayDate = formatISO(new Date(), {
+    representation: "date",
+  });
+
+  if (
+    status === "completed" &&
+    actionData.action_type !== "cycle_generated" &&
+    todayDate >= currentNextDate
+  ) {
     // The end of the current cycle becomes the start of the next cycle
     const nextCycleStartDate = currentNextDate;
     // Calculate the actual next invoice date for the new cycle
@@ -370,21 +376,28 @@ function syncRecurringLifecycle(db, recurringInvoiceId, actionData = {}) {
     );
 
     // IDEMPOTENCY CHECK: Do not generate a new cycle if it already exists for this date
-    const existingCycle = db.prepare(`
+    const existingCycle = db
+      .prepare(
+        `
       SELECT id FROM recurring_invoice_history
       WHERE recurring_invoice_id = ?
       AND invoice_start_date = ?
       AND action_type = 'cycle_generated'
       LIMIT 1
-    `).get(recurringInvoiceId, nextCycleStartDate);
+    `,
+      )
+      .get(recurringInvoiceId, nextCycleStartDate);
 
     if (existingCycle) {
-      deleteDuplicateGeneratedCycles(db, recurringInvoiceId, nextCycleStartDate);
-      // Master plan must still be updated to ensure it points to the future
-      db.prepare("UPDATE recurring_invoices SET start_date = ? WHERE id = ?").run(
-        nextCycleStartDate,
+      deleteDuplicateGeneratedCycles(
+        db,
         recurringInvoiceId,
+        nextCycleStartDate,
       );
+      // Master plan must still be updated to ensure it points to the future
+      db.prepare(
+        "UPDATE recurring_invoices SET start_date = ? WHERE id = ?",
+      ).run(nextCycleStartDate, recurringInvoiceId);
       return { status, pending_amount, paid_amount };
     }
 
@@ -425,7 +438,7 @@ function getRecurring(id, light = false) {
   SELECT
     r.*,
 
-    c.company_name,
+    c.company_name, 
     c.contact_person,
     c.email,
     c.phone,
@@ -446,8 +459,8 @@ function getRecurring(id, light = false) {
 
   FROM recurring r
 
-  LEFT JOIN customers c
-    ON c.id = r.customer_id
+  LEFT JOIN contacts c 
+    ON c.id = r.contact_id AND c.is_customer = 1 
 
   LEFT JOIN company co
     ON co.id = 1
@@ -632,15 +645,15 @@ function getRecurring(id, light = false) {
           ) AS cycle_payment_id
         FROM recurring_invoice_history rih
         JOIN recurring_invoices ri ON ri.id = rih.recurring_invoice_id
-        LEFT JOIN incoming_payments hp ON hp.id = rih.payment_id
-        LEFT JOIN bank_transactions hbt ON hbt.id = hp.bank_transaction_id
+        LEFT JOIN incoming_payments hp ON hp.id = rih.payment_id 
+        LEFT JOIN bank_transactions hbt ON hbt.id = hp.bank_transaction_id 
         WHERE ri.recurring_id = ?
           AND (
             rih.action_type <> 'payment_received'
             OR (
               COALESCE(hp.is_deleted, 0) = 0
               AND (
-                hp.bank_transaction_id IS NULL
+                hp.bank_transaction_id IS NULL 
                 OR COALESCE(hbt.is_deleted, 0) = 0
               )
               AND rih.id = (
@@ -679,7 +692,6 @@ function getRecurring(id, light = false) {
     )
     .all(id);
 
-     
   return {
     ...recurring,
     invoice_items: invoiceItems,
@@ -697,11 +709,11 @@ function getPlan(id) {
     SELECT 
       ri.*, 
       ri.recurring_invoice_no,
-      r.customer_id, 
-      c.company_name
+      r.contact_id, 
+      c.company_name 
     FROM recurring_invoices ri
     JOIN recurring r ON r.id = ri.recurring_id
-    JOIN customers c ON c.id = r.customer_id
+    JOIN contacts c ON c.id = r.contact_id AND c.is_customer = 1 
     WHERE ri.id = ?
   `,
     )
@@ -730,10 +742,10 @@ function createRecurring(data) {
   const db = getDb();
 
   const tx = db.transaction(() => {
-    const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
+    const company = db.prepare("SELECT * FROM company WHERE id = 1").get(); // This is fine
     const customer = db
-      .prepare("SELECT * FROM customers WHERE id = ?")
-      .get(data.customer_id);
+      .prepare("SELECT * FROM contacts WHERE id = ? AND is_customer = 1")
+      .get(data.contact_id);
     const sameState =
       String(company?.state || "")
         .trim()
@@ -744,25 +756,27 @@ function createRecurring(data) {
     const isOverseas =
       String(customer?.gst_treatment || "").toLowerCase() === "overseas";
 
-    const outgoingSetting = db.prepare("SELECT value FROM settings WHERE key = 'gst_enabled_outgoing'").get();
-    const defaultGstEnabled = outgoingSetting?.value !== '0' ? 1 : 0;
+    const outgoingSetting = db
+      .prepare("SELECT value FROM settings WHERE key = 'gst_enabled_outgoing'")
+      .get();
+    const defaultGstEnabled = outgoingSetting?.value !== "0" ? 1 : 0;
 
     const result = db
       .prepare(
         `
-       INSERT INTO recurring (
-  customer_id,
-  invoice_id
-)
+       INSERT INTO recurring ( 
+  contact_id, 
+  invoice_id 
+) 
 
-VALUES (
-  @customer_id,
-  @invoice_id
-)
+VALUES ( 
+  @contact_id, 
+  @invoice_id 
+) 
       `,
       )
       .run({
-        customer_id: data.customer_id,
+        contact_id: data.contact_id, // Already updated in previous turn
 
         invoice_id: data.invoice_id || null,
       });
@@ -788,9 +802,12 @@ VALUES (
         0,
       );
 
-      const isGstEnabled = template.is_gst_enabled !== undefined
-        ? (template.is_gst_enabled ? 1 : 0)
-        : defaultGstEnabled;
+      const isGstEnabled =
+        template.is_gst_enabled !== undefined
+          ? template.is_gst_enabled
+            ? 1
+            : 0
+          : defaultGstEnabled;
 
       const { items: processedItems, ...totals } = calculateGSTTotals({
         items: validItemsInput,
@@ -998,10 +1015,10 @@ function updateRecurring(id, data) {
   const db = getDb();
 
   const tx = db.transaction(() => {
-    const company = db.prepare("SELECT * FROM company WHERE id = 1").get();
+    const company = db.prepare("SELECT * FROM company WHERE id = 1").get(); // This is fine
     const customer = db
-      .prepare("SELECT * FROM customers WHERE id = ?")
-      .get(data.customer_id);
+      .prepare("SELECT * FROM contacts WHERE id = ? AND is_customer = 1")
+      .get(data.contact_id);
     const sameState =
       String(company?.state || "")
         .trim()
@@ -1012,8 +1029,10 @@ function updateRecurring(id, data) {
     const isOverseas =
       String(customer?.gst_treatment || "").toLowerCase() === "overseas";
 
-    const outgoingSetting = db.prepare("SELECT value FROM settings WHERE key = 'gst_enabled_outgoing'").get();
-    const defaultGstEnabled = outgoingSetting?.value !== '0' ? 1 : 0;
+    const outgoingSetting = db
+      .prepare("SELECT value FROM settings WHERE key = 'gst_enabled_outgoing'")
+      .get();
+    const defaultGstEnabled = outgoingSetting?.value !== "0" ? 1 : 0;
 
     const oldData = getRecurring(id);
 
@@ -1022,15 +1041,15 @@ function updateRecurring(id, data) {
       UPDATE recurring
 
 SET
-  customer_id = @customer_id,
-  invoice_id = @invoice_id
+  contact_id = @contact_id, 
+  invoice_id = @invoice_id 
 
-WHERE id = @id
+WHERE id = @id 
     `,
     ).run({
       id,
 
-      customer_id: data.customer_id,
+      contact_id: data.contact_id, // Already updated in previous turn
 
       invoice_id: data.invoice_id || null,
     });
@@ -1077,8 +1096,17 @@ WHERE id = @id
         0,
       );
 
-      const isGstEnabledPayload = template.is_gst_enabled !== undefined 
-        ? (template.is_gst_enabled ? 1 : 0) 
+      const isGstEnabledPayload =
+        template.is_gst_enabled !== undefined
+          ? template.is_gst_enabled
+            ? 1
+            : 0
+          : null;
+
+      let recurringInvoiceId = template.id;
+
+      const oldPlan = recurringInvoiceId
+        ? oldData.templates.find((t) => t.id === recurringInvoiceId)
         : null;
 
       const { items: processedItems, ...totals } = calculateGSTTotals({
@@ -1088,16 +1116,13 @@ WHERE id = @id
         discount_is_percent: template.discount_is_percent,
         sameState,
         isOverseas,
-        isGstEnabled: isGstEnabledPayload !== null ? (isGstEnabledPayload === 1) : (oldPlan?.is_gst_enabled !== 0)
+        isGstEnabled:
+          isGstEnabledPayload !== null
+            ? isGstEnabledPayload === 1
+            : oldPlan?.is_gst_enabled !== 0,
       });
 
-      let recurringInvoiceId = template.id;
-
       if (recurringInvoiceId) {
-        const oldPlan = oldData.templates.find(
-          (t) => t.id === recurringInvoiceId,
-        );
-
         // Detection logic: Sync if dates/cycle changed, OR if history is corrupted (Next Date == Start Date)
         const nextDateInHistory = oldPlan?.next_invoice_date;
         const isHistoryCorrupted = nextDateInHistory === template.start_date;
@@ -1139,7 +1164,10 @@ WHERE id = @id
           recurring_invoice_no: finalRecurringInvoiceNo,
           billing_cycle: template.billing_cycle,
           custom_billing_cycle: template.custom_billing_cycle || null,
-          is_gst_enabled: isGstEnabledPayload !== null ? isGstEnabledPayload : (oldPlan?.is_gst_enabled ?? 1),
+          is_gst_enabled:
+            isGstEnabledPayload !== null
+              ? isGstEnabledPayload
+              : (oldPlan?.is_gst_enabled ?? 1),
           start_date: template.start_date,
           is_stopped: template.is_stopped ? 1 : 0,
           stopped_reason: template.stopped_reason || "",
@@ -1177,9 +1205,10 @@ WHERE id = @id
           });
         }
       } else {
-        const isGstEnabled = isGstEnabledPayload !== null 
-          ? isGstEnabledPayload 
-          : defaultGstEnabled;
+        const isGstEnabled =
+          isGstEnabledPayload !== null
+            ? isGstEnabledPayload
+            : defaultGstEnabled;
 
         // INSERT NEW PLAN
         const result = db
@@ -1364,7 +1393,7 @@ function generateDueInvoices() {
       `
       SELECT
   ri.*,
-  r.customer_id
+  r.contact_id 
 
   FROM recurring_invoices ri
   JOIN recurring r ON r.id = ri.recurring_id
@@ -1404,7 +1433,7 @@ function generateDueInvoices() {
       .all(row.id);
 
     const invoice = createInvoice({
-      customer_id: row.customer_id,
+      contact_id: row.contact_id, // Already updated in previous turn
       is_recurring: true,
       recurring_id: row.id,
       is_gst_enabled: row.is_gst_enabled,
@@ -1658,9 +1687,9 @@ function listAllHistory() {
     SELECT
       rih.*,
       ri.recurring_invoice_no,
-      ri.grand_total,
+  ri.grand_total, 
       r.id AS recurring_id,
-      r.customer_id,
+  r.contact_id, 
 
       c.company_name,
       c.contact_person,
@@ -1679,8 +1708,8 @@ function listAllHistory() {
     JOIN recurring r
       ON r.id = ri.recurring_id
 
-    JOIN customers c
-      ON c.id = r.customer_id
+    JOIN contacts c 
+      ON c.id = r.contact_id AND c.is_customer = 1 
 
     JOIN company co
       ON co.id = 1
