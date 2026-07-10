@@ -2,6 +2,10 @@
   "name": "sv-billing",
   "version": "1.0.0",
   "description": "SV IT Hub Billing - Offline GST Billing & Service Management",
+  "author": "Tanmay Joshi",
+  "company": "S V IT HUB",
+  "license": "Proprietary",
+  "copyright": "© 2026 S V IT HUB",
   "main": "electron/main.js",
   "scripts": {
     "dev:renderer": "vite",
